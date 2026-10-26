@@ -1,10 +1,89 @@
 """The shapes of the UnderCover API."""
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Status = Literal["waiting", "in_progress", "awaiting_sign_off", "decided"]
+Outcome = Literal["approve", "decline", "refer"]
+StepKind = Literal["tool_call", "tool_result", "reply", "note"]
+
+
+class Decision(BaseModel):
+    decision: Outcome
+    payout: float
+    reason: str
+    policy_section: str
+    decided_at: str
+
+
+class SignOff(BaseModel):
+    handler_id: str
+    handler_name: str
+    signed_off_at: str
+
+
+class Payment(BaseModel):
+    amount: float
+    paid_at: str
+
+
+class ClaimState(BaseModel):
+    claim_id: str
+    status: Status
+    decision: Decision | None
+    sign_off: SignOff | None
+    payment: Payment | None
+
+
+class StartRequest(BaseModel):
+    thread_id: str = Field(min_length=1)
+
+
+class StepRequest(BaseModel):
+    thread_id: str = Field(min_length=1)
+    kind: StepKind
+    text: str = Field(min_length=1)
+
+
+class Step(BaseModel):
+    step_id: int
+    thread_id: str
+    kind: StepKind
+    text: str
+    created_at: str
+
+
+class DecisionRequest(BaseModel):
+    decision: Outcome
+    payout: float = Field(ge=0, description="In US dollars; zero unless approved.")
+    reason: str = Field(min_length=1)
+    policy_section: str = Field(min_length=1)
+
+    @field_validator("payout")
+    @classmethod
+    def to_cents(cls, payout: float) -> float:
+        return round(payout, 2)
+
+    @model_validator(mode="after")
+    def payout_matches_decision(self) -> Self:
+        if self.decision == "approve" and self.payout == 0:
+            raise ValueError("An approval needs a payout over zero.")
+        if self.decision != "approve" and self.payout != 0:
+            raise ValueError("A decline or a referral pays nothing.")
+        return self
+
+
+class PaymentRequest(BaseModel):
+    amount: float = Field(gt=0, description="In US dollars.")
+
+
+class SignOffRequest(BaseModel):
+    handler_id: str
+
+
+class RunStarted(BaseModel):
+    thread_id: str
 
 
 class Item(BaseModel):
@@ -26,11 +105,11 @@ class ClaimSummary(BaseModel):
     amount_claimed: float
     submitted_on: str
     status: Status
+    decision: Outcome | None
+    payout: float | None
 
 
-class Claim(BaseModel):
-    claim_id: str
-    status: Status
+class Claim(ClaimState):
     policy_id: str
     customer_id: str
     claim_type: str

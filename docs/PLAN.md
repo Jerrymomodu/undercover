@@ -109,14 +109,14 @@ Build the operations that change a claim, with the rules in the backend.
 
 Success criteria:
 
-- [ ] Tests walk a claim through each path: decline, refer, approve and pay at $1,000 or less, and approve over $1,000, blocked payment, sign-off, paid.
-- [ ] Approving a claim at $1,250.00 and then calling `pay_claim` with 1250 returns `403` with "A payout over $1,000.00 needs a handler's sign-off.", records no payment, and leaves the claim `awaiting_sign_off`.
-- [ ] Approving at exactly $1,000.00 moves the claim to `decided`, and `pay_claim` with 1000 succeeds.
-- [ ] `pay_claim` returns `409` for a wrong amount, a second payment, or a claim that was declined or referred.
-- [ ] `decide_claim` returns `409` on a claim that isn't in progress, and `422` for an approval of zero or a decline with a payout.
-- [ ] `sign_off_claim` returns `404` for an unknown handler and `409` for a claim that isn't waiting for sign-off; afterwards the claim shows the handler's name and the payment.
-- [ ] `start_claim` on a claim already in progress returns `409`.
-- [ ] `npm run check:python` passes with coverage of 80% or more.
+- [x] Tests walk a claim through each path: decline, refer, approve and pay at $1,000 or less, and approve over $1,000, blocked payment, sign-off, paid.
+- [x] Approving a claim at $1,250.00 and then calling `pay_claim` with 1250 returns `403` with "A payout over $1,000.00 needs a handler's sign-off.", records no payment, and leaves the claim `awaiting_sign_off`.
+- [x] Approving at exactly $1,000.00 moves the claim to `decided`, and `pay_claim` with 1000 succeeds.
+- [x] `pay_claim` returns `409` for a wrong amount, a second payment, or a claim that was declined or referred.
+- [x] `decide_claim` returns `409` on a claim that isn't in progress, and `422` for an approval of zero or a decline with a payout.
+- [x] `sign_off_claim` returns `404` for an unknown handler and `409` for a claim that isn't waiting for sign-off; afterwards the claim shows the handler's name and the payment.
+- [x] `start_claim` on a claim already in progress returns `409`.
+- [x] `npm run check:python` passes with coverage of 80% or more.
 
 ## Phase 3: The UnderCover Agent
 
