@@ -129,13 +129,13 @@ Build the agent on the skeleton's `create_agent` setup.
 
 Success criteria:
 
-- [ ] A stub-model test runs a claim through the tools to a decline and checks the claim is `decided` with the reason and section, and that its steps include each tool call and the final reply.
-- [ ] A stub-model test approves $1,250.00, has the agent call `pay_claim`, and checks the tool reply contains the `403` message, no payment exists and the claim is `awaiting_sign_off`.
-- [ ] A stub-model test that ends without a decision leaves the claim `waiting`, with a last step that says the run ended without a decision.
-- [ ] A test confirms the system prompt the agent uses is the text `GET /api/instructions` returns.
-- [ ] `POST /api/claims/CLM-1001/run` returns a thread id and starts the agent (tested with `run` replaced by a stub).
-- [ ] The CLI runs the claims it's given (tested with `run` replaced by a stub).
-- [ ] `npm run check:python` passes with coverage of 80% or more.
+- [x] A stub-model test runs a claim through the tools to a decline and checks the claim is `decided` with the reason and section, and that its steps include each tool call and the final reply.
+- [x] A stub-model test approves $1,250.00, has the agent call `pay_claim`, and checks the tool reply contains the `403` message, no payment exists and the claim is `awaiting_sign_off`.
+- [x] A stub-model test that ends without a decision leaves the claim `waiting`, with a last step that says the run ended without a decision.
+- [x] A test confirms the system prompt the agent uses is the text `GET /api/instructions` returns.
+- [x] `POST /api/claims/CLM-1001/run` returns a thread id and starts the agent (tested with `run` replaced by a stub).
+- [x] The CLI runs the claims it's given (tested with `run` replaced by a stub).
+- [x] `npm run check:python` passes with coverage of 80% or more.
 
 ## Phase 4: The dashboard shell, the queue and the instructions
 
