@@ -178,16 +178,17 @@ Check the whole product together, then run the real agent on a few claims.
 
 - `playwright.config.ts`: a backend on port 8001 with its own database, seeded fresh each run, and a dashboard on port 5174 pointed at it. `dashboard/vite.config.ts` reads the backend port from `BACKEND_PORT`, defaulting to 8000.
 - Playwright tests: the queue lists 25 claims; a claim page shows the claim in full; steps posted through the API appear on the claim page; the over-limit path, from approval to blocked payment to sign-off to paid; the instructions page.
-- `README.md` sections for the backend, agent and dashboard stay short; `docs/STATUS.md` says what's built and how to run it.
+- `docs/STATUS.md` says what's built and how to run it. (`README.md` is the course guide, so the product's notes live in `docs/STATUS.md`, as AGENTS.md describes.)
 - A real run, which calls the model: from the dashboard, run the agent on three claims, including one with more than $1,000 claimed. This costs a few cents on `openai/gpt-6-luna`, or nothing with `MODEL_NAME=openrouter/free`. The decisions aren't scored against `data/evals/`; that's for a later day.
 
 Success criteria:
 
-- [ ] `npm run e2e` passes, and running it while `npm run dev` is up leaves the dev database unchanged.
-- [ ] In the browser with the Playwright MCP server, a real run shows the agent's steps appearing while it works, then a decision with a two-or-three-sentence reason and a policy section.
-- [ ] If the agent approves a payout over $1,000, the claim shows Waiting for sign-off and the steps show its payment was blocked.
-- [ ] `npm run check` passes in full.
-- [ ] `docs/STATUS.md` describes the pilot and how to run it.
+- [x] `npm run e2e` passes, and running it while `npm run dev` is up leaves the dev database unchanged.
+- [x] In the browser with the Playwright MCP server, a real run shows the agent's steps appearing while it works, then a decision with a two-or-three-sentence reason and a policy section.
+- [x] If the agent approves a payout over $1,000, the claim shows Waiting for sign-off and the steps show its payment was blocked.
+- Found in the real run: with the first instructions the agent skipped `pay_claim` on a payout over $1,000, because it was told the payment would be refused. Step 9 now says to pay every approval and let the system decide, and the instructions ask for plain text, not Markdown.
+- [x] `npm run check` passes in full.
+- [x] `docs/STATUS.md` describes the pilot and how to run it.
 
 ## Not in this plan
 
