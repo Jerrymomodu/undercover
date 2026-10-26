@@ -4,7 +4,7 @@ from contextlib import closing
 from fastapi.testclient import TestClient
 
 from backend import db, seed
-from backend.main import app
+from backend.main import INSTRUCTIONS, app
 
 
 def counts() -> dict[str, int]:
@@ -132,7 +132,8 @@ def test_get_policy_wording(client):
 
 def test_get_instructions(client):
     instructions = client.get("/api/instructions").json()["content"]
-    assert instructions == seed.INSTRUCTIONS.read_text(encoding="utf-8")
+    assert instructions == INSTRUCTIONS.read_text(encoding="utf-8")
+    assert instructions.startswith("# The UnderCover Agent")
 
 
 def test_list_handlers(client):

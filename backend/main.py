@@ -6,6 +6,7 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
@@ -31,6 +32,8 @@ from backend.models import (
     StepRequest,
     Text,
 )
+
+INSTRUCTIONS = Path(__file__).parent / "instructions.md"
 
 STATUS_LABELS = {
     "waiting": "waiting",
@@ -215,9 +218,9 @@ def get_policy_wording(connection: DB) -> Text:
 
 
 @app.get("/api/instructions", operation_id="get_instructions")
-def get_instructions(connection: DB) -> Text:
+def get_instructions() -> Text:
     """Get the UnderCover Agent's instructions."""
-    return document(connection, "instructions")
+    return Text(content=INSTRUCTIONS.read_text(encoding="utf-8"))
 
 
 @app.get("/api/handlers", operation_id="list_handlers")

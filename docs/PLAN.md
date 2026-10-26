@@ -79,7 +79,8 @@ The agent's tools are `get_claim`, `get_policy`, `get_claim_history`, `get_polic
 Build the database and the read side of the API.
 
 - `backend/db.py`: the schema (claims, policies, customers, plans, add-ons, handlers, settings, documents, decisions, payments, steps) and a connection helper.
-- `backend/seed.py`: rebuilds the database from `data/claims.json`, `policies.json`, `customers.json`, `plans.json`, `handlers.json`, `company.json` and `policy_wording.md`, plus `backend/instructions.md` (a first draft here; Phase 3 writes it properly). Claims seed as `waiting`. `npm run seed` runs it.
+- `backend/seed.py`: rebuilds the database from `data/claims.json`, `policies.json`, `customers.json`, `plans.json`, `handlers.json`, `company.json` and `policy_wording.md`. Claims seed as `waiting`. `npm run seed` runs it.
+- `GET /api/instructions` reads `backend/instructions.md` on each request (a first draft here; Phase 3 writes it properly), so an edit to the file shows at once without reseeding. (Changed in Phase 4: the first version copied the file into the database, where it went stale.)
 - The read operations from the table above, each with a Pydantic response model. `get_policy` includes the plan's limits and the details of the policy's add-ons. `list_claims` gives each claim's id, customer name, type, amount claimed, submitted date, status, and the decision and payout once there is one.
 - Unknown ids return `404`.
 
@@ -149,10 +150,10 @@ Build the dashboard's frame and two of its pages, in the UnderCover brand.
 
 Success criteria:
 
-- [ ] Vitest tests, with `fetch` stubbed, cover the queue (rows, counts, status labels, money as $1,250.00) and the instructions page.
-- [ ] In the browser with the Playwright MCP server, after `npm run dev`: the queue shows 25 claims, all Waiting, in the brand fonts and colors; clicking a row opens `#/claims/<id>`; the instructions page shows the text from `backend/instructions.md`.
-- [ ] The same pages read well in dark mode (checked with the Playwright MCP server's dark color scheme).
-- [ ] `npm run check:ts` passes with coverage of 80% or more.
+- [x] Vitest tests, with `fetch` stubbed, cover the queue (rows, counts, status labels, money as $1,250.00) and the instructions page.
+- [x] In the browser with the Playwright MCP server, after `npm run dev`: the queue shows 25 claims, all Waiting, in the brand fonts and colors; clicking a row opens `#/claims/<id>`; the instructions page shows the text from `backend/instructions.md`.
+- [x] The same pages read well in dark mode (checked with the Playwright MCP server's dark color scheme).
+- [x] `npm run check:ts` passes with coverage of 80% or more.
 
 ## Phase 5: The claim page
 

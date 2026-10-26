@@ -2,13 +2,11 @@
 
 import json
 from contextlib import closing
-from pathlib import Path
 from typing import Any
 
 from backend import db
 
 DATA = db.ROOT / "data"
-INSTRUCTIONS = Path(__file__).parent / "instructions.md"
 
 
 def load(name: str) -> Any:
@@ -30,15 +28,9 @@ def seed() -> None:
                 "INSERT INTO settings VALUES (?, ?)",
                 [(k, json.dumps(v)) for k, v in load("company.json").items()],
             )
-            connection.executemany(
-                "INSERT INTO documents VALUES (?, ?)",
-                [
-                    (
-                        "policy_wording",
-                        (DATA / "policy_wording.md").read_text(encoding="utf-8"),
-                    ),
-                    ("instructions", INSTRUCTIONS.read_text(encoding="utf-8")),
-                ],
+            connection.execute(
+                "INSERT INTO documents VALUES ('policy_wording', ?)",
+                ((DATA / "policy_wording.md").read_text(encoding="utf-8"),),
             )
             connection.executemany(
                 """INSERT INTO plans VALUES (:plan, :name, :trip_cancellation_max,
