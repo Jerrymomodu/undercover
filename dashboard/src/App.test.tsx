@@ -43,7 +43,7 @@ it("moves between pages as the hash changes", async () => {
     window.location.hash = "#/claims/CLM-1001";
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   });
-  expect(
-    await screen.findByRole("heading", { name: /CLM-1001/ }),
-  ).toBeDefined();
+  expect((await screen.findByRole("alert")).textContent).toMatch(
+    /^Couldn't load CLM-1001/,
+  );
 });

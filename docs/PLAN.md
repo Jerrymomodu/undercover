@@ -168,9 +168,9 @@ Build the page that shows one claim in full.
 
 Success criteria:
 
-- [ ] Vitest tests, with `fetch` stubbed, cover a waiting claim with its run button, a claim in progress with its steps, a decided claim with its decision and payment, and the sign-off.
-- [ ] In the browser with the Playwright MCP server: CLM-1001 shows its story, three items and four documents, the Premium policy and the customer's earlier claim; after setting up an approval of $1,250.00 through the API, the page shows Waiting for sign-off, and signing off as Dana Whitfield shows the claim Decided and paid $1,250.00.
-- [ ] `npm run check:ts` passes with coverage of 80% or more.
+- [x] Vitest tests, with `fetch` stubbed, cover a waiting claim with its run button, a claim in progress with its steps, a decided claim with its decision and payment, and the sign-off.
+- [x] In the browser with the Playwright MCP server: CLM-1001 shows its story, three items and four documents, the Premium policy and the customer's earlier claim; after setting up an approval of $1,250.00 through the API, the page shows Waiting for sign-off, and signing off as Dana Whitfield shows the claim Decided and paid $1,250.00.
+- [x] `npm run check:ts` passes with coverage of 80% or more.
 
 ## Phase 6: End-to-end tests and a real run
 

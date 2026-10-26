@@ -244,3 +244,195 @@ td.number {
   background: var(--raspberry);
   color: #ffffff;
 }
+
+button,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 1.1rem;
+  background: var(--sea-green);
+  color: var(--midnight);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+select {
+  border: 0;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  background: var(--subtle);
+  color: var(--ink);
+}
+
+.claim-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.claim-heading h1 {
+  margin: 0;
+}
+
+.summary {
+  margin: 0.5rem 0 1.5rem;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+}
+
+.claim-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 800px) {
+  .claim-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.items td {
+  white-space: normal;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.story {
+  margin: 0;
+}
+
+.document + .document {
+  margin-top: 1rem;
+}
+
+.document h3 {
+  margin-bottom: 0.25rem;
+  font-size: 1rem;
+}
+
+.document p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+tfoot th,
+tfoot td {
+  font-weight: 700;
+}
+
+.outcome {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.outcome-approve {
+  color: var(--sea-green-ink);
+}
+
+.outcome-decline {
+  color: var(--raspberry);
+}
+
+.outcome-refer {
+  color: var(--marigold-ink);
+}
+
+.sign-off,
+.payment {
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  background: var(--subtle);
+}
+
+.sign-off p {
+  margin-top: 0;
+}
+
+.sign-off label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+}
+
+.sign-off-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.steps {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.step-kind {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.step-text {
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+.step-tool_call .step-text,
+.step-tool_result .step-text {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+}
+
+.step-reply .step-text {
+  font-weight: 600;
+}
+
+.working {
+  margin-bottom: 0;
+  color: var(--marigold-ink);
+}
+
+.history {
+  margin: 0;
+  padding-left: 1.1rem;
+}

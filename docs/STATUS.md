@@ -1,6 +1,6 @@
 # Status
 
-The pilot is being built from `docs/PLAN.md`. Phases 1 to 4 of 6 are done.
+The pilot is being built from `docs/PLAN.md`. Phases 1 to 5 of 6 are done.
 
 ## Built so far
 
@@ -8,7 +8,8 @@ The pilot is being built from `docs/PLAN.md`. Phases 1 to 4 of 6 are done.
 - The claim workflow in `backend/`: starting a claim, recording steps, deciding, paying, signing off and releasing. A payout over $1,000 can only be paid after a handler signs off, and the sign-off makes the payment.
 - `agent/`: the UnderCover Agent. `run(claim_id, thread_id)` reads its instructions from `GET /api/instructions` (read from `backend/instructions.md` on each request), starts the claim, decides it with six tools over the API, records each step, and puts the claim back in the queue if the run ends without a decision.
 - `POST /api/claims/{claim_id}/run` starts the agent on a waiting claim in the background.
-- `dashboard/`: the UnderCover brand in light and dark mode, the claims queue with counts by status (refreshed every 3 seconds), and the agent's instructions, read only. Pages are chosen by the URL hash: `#/`, `#/claims/<id>` and `#/instructions`. The claim page is a placeholder until Phase 5.
+- `dashboard/`: the UnderCover brand in light and dark mode, the claims queue with counts by status (refreshed every 3 seconds), and the agent's instructions, read only. Pages are chosen by the URL hash: `#/`, `#/claims/<id>` and `#/instructions`.
+- The claim page: the claim in full with its items and documents, the policy, the customer and their earlier claims, the decision with its reason and policy section, and the payment. It shows the agent's steps, refreshed every second while the agent works. A waiting claim has a "Run the agent" button; a claim waiting for sign-off lets a handler sign off, which pays it.
 - `e2e/`: one test that the queue lists every claim
 
 ## Running it
