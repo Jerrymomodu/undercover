@@ -188,12 +188,12 @@ Add the "This run" panel to the queue page and the Left for a handler state acro
 
 Add the "What the agent read" panel, the `reading` and `error` steps, and the left-for-handler message on the claim page.
 
-- [ ] vitest covers the panel with and without readings, each step kind, and the decision panel for a claim left for a handler
-- [ ] e2e: the test starts a claim and records a `reading` step through the API. Without a reload, it appears in "What the agent read"
-- [ ] e2e: the test starts and releases a claim twice through the API. Without a reload, the page shows Left for a handler, both errors in the steps and "after 2 tries" in the decision panel
-- [ ] Browser: on a claim with both, readings and errors are easy to tell apart from tool calls, and errors use Raspberry
-- [ ] Browser: `browser_console_messages` shows no errors
-- [ ] `npm run check` passes
+- [x] vitest covers the panel with and without readings, each step kind, and the decision panel for a claim left for a handler
+- [x] e2e: the test starts a claim and records a `reading` step through the API. Without a reload, it appears in "What the agent read"
+- [x] e2e: the test starts and releases a claim twice through the API. Without a reload, the page shows Left for a handler, both errors in the steps and "after 2 tries" in the decision panel
+- [x] Browser: on a claim with both, readings and errors are easy to tell apart from tool calls, and errors use Raspberry
+- [x] Browser: `browser_console_messages` shows no errors
+- [x] `npm run check` passes
 
 ## Phase 6: The documents and the live trial
 

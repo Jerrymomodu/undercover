@@ -232,3 +232,67 @@ it("shows why a sign-off was refused", async () => {
     "Claim CLM-1002 is not waiting for sign-off",
   );
 });
+
+function step(step_id: number, kind: Step["kind"], content: string): Step {
+  return { step_id, thread_id: "t-1", kind, content, created_at: decidedAt };
+}
+
+async function panelTitled(name: string) {
+  const heading = await screen.findByRole("heading", { name });
+  const panel = heading.closest("section");
+  if (!panel) throw new Error(`The ${name} heading has no panel`);
+  return within(panel);
+}
+
+it("says when the agent hasn't read anything yet", async () => {
+  showClaim(claim);
+  const panel = await panelTitled("What the agent read");
+  expect(panel.getByText(/Nothing yet/)).toBeDefined();
+});
+
+it("lists the sections the agent read, once each", async () => {
+  showClaim(approved, [
+    step(1, "tool_call", 'read_section(document="policy_wording", number=5)'),
+    step(
+      2,
+      "reading",
+      "Policy wording, section 5: Baggage and Personal Effects",
+    ),
+    step(3, "reading", "Claims manual, section 7: Interpretation notes"),
+    step(
+      4,
+      "reading",
+      "Policy wording, section 5: Baggage and Personal Effects",
+    ),
+  ]);
+  const panel = await panelTitled("What the agent read");
+  expect(
+    panel.getAllByRole("listitem").map((item) => item.textContent),
+  ).toEqual([
+    "Policy wording, section 5: Baggage and Personal Effects",
+    "Claims manual, section 7: Interpretation notes",
+  ]);
+  const work = await panelTitled("Agent at work");
+  const reading = work.getByText(
+    "Claims manual, section 7: Interpretation notes",
+  );
+  expect(reading.closest("li")?.className).toBe("step step-reading");
+  expect(reading.closest("p")?.textContent).toMatch(/^Read /);
+});
+
+it("shows a claim left for a handler and why", async () => {
+  showClaim({ ...claim, status: "left_for_handler", failures: 2 }, [
+    step(1, "error", "RuntimeError: The model provider is unavailable"),
+    step(2, "error", "The agent finished without recording a decision"),
+  ]);
+  const panel = await decisionPanel();
+  expect(
+    panel.getByText(/couldn't finish this claim after 2 tries/),
+  ).toBeDefined();
+  const error = await screen.findByText(
+    "The agent finished without recording a decision",
+  );
+  expect(error.closest("li")?.className).toBe("step step-error");
+  expect(error.closest("p")?.textContent).toMatch(/^Failed /);
+  expect(screen.getAllByText("Left for a handler").length).toBeGreaterThan(0);
+});

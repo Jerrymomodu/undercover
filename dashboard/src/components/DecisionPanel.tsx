@@ -12,13 +12,7 @@ export function DecisionPanel({
   return (
     <section className="panel" aria-labelledby="decision-title">
       <h2 id="decision-title">Decision</h2>
-      {!decision && (
-        <p className="muted">
-          {claim.status === "in_progress"
-            ? "The agent is working on this claim."
-            : "The agent hasn't started on this claim."}
-        </p>
-      )}
+      {!decision && <Undecided claim={claim} />}
       {decision && (
         <>
           <div className="decision-line">
@@ -52,5 +46,23 @@ export function DecisionPanel({
         </div>
       )}
     </section>
+  );
+}
+
+function Undecided({ claim }: Readonly<{ claim: Claim }>) {
+  if (claim.status === "left_for_handler")
+    return (
+      <p className="left-for-handler">
+        The agent couldn't finish this claim after {String(claim.failures)}{" "}
+        tries, so a handler needs to decide it. The steps below show what went
+        wrong.
+      </p>
+    );
+  return (
+    <p className="muted">
+      {claim.status === "in_progress"
+        ? "The agent is working on this claim."
+        : "The agent hasn't started on this claim."}
+    </p>
   );
 }
