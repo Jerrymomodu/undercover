@@ -176,13 +176,13 @@ Write `backend/instructions/queue.md`. Build the queue agent with `list_claims`,
 
 Add the "This run" panel to the queue page and the Left for a handler state across the dashboard.
 
-- [ ] vitest covers the panel with no run, a running run with an item in each state, and a finished run with its summary, and the fifth tile, against a stubbed `fetch`
-- [ ] e2e: with the queue open, the test starts a run and writes a to-do list through the API. Without a reload, the list appears; after the test ticks an item off and finishes the run, the page shows Done on that item, Finished and the summary
-- [ ] Browser, `/`: before any run, the panel says "No run yet". The tiles show five states, with Left for a handler at 0
-- [ ] Browser, with `browser_evaluate`: each to-do chip and the Left for a handler chip have the colors from the design
-- [ ] Browser: screenshots of the queue with a run in light and dark mode show rounded panels with no outlines, no one-edge borders and no gradients
-- [ ] Browser: `browser_console_messages` shows no errors
-- [ ] `npm run check` passes
+- [x] vitest covers the panel with no run, a running run with an item in each state, and a finished run with its summary, and the fifth tile, against a stubbed `fetch`
+- [x] e2e: with the queue open, the test starts a run and writes a to-do list through the API. Without a reload, the list appears; after the test ticks an item off and finishes the run, the page shows Done on that item, Finished and the summary
+- [x] Browser, `/`: before any run, the panel says "No run yet". The tiles show five states, with Left for a handler at 0
+- [x] Browser, with `browser_evaluate`: each to-do chip and the Left for a handler chip have the colors from the design
+- [x] Browser: screenshots of the queue with a run in light and dark mode show rounded panels with no outlines, no one-edge borders and no gradients
+- [x] Browser: `browser_console_messages` shows no errors
+- [x] `npm run check` passes
 
 ## Phase 5: Dashboard: what the agent read, and failures
 

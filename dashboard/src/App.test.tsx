@@ -19,6 +19,7 @@ function renderAt(path: string) {
 
 it("shows the queue with counts by state", async () => {
   stubApi({
+    "GET /api/runs/current": null,
     "GET /api/claims": [
       summary,
       {
@@ -36,6 +37,7 @@ it("shows the queue with counts by state", async () => {
   expect(screen.getByLabelText("Waiting: 1")).toBeDefined();
   expect(screen.getByLabelText("Decided: 1")).toBeDefined();
   expect(screen.getByLabelText("In progress: 0")).toBeDefined();
+  expect(screen.getByLabelText("Left for a handler: 0")).toBeDefined();
   const row = screen.getByRole("row", { name: /CLM-1003/ });
   expect(within(row).getByText("Approved")).toBeDefined();
   expect(within(row).getByText("$420.00")).toBeDefined();

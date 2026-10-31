@@ -53,6 +53,7 @@ export const claim: Claim = {
     },
   ],
   status: "waiting",
+  failures: 0,
   thread_id: null,
   decision: null,
   payment: null,
@@ -66,6 +67,7 @@ export const summary: ClaimSummary = {
   amount_claimed: 1150,
   submitted_on: "2026-07-20",
   status: "waiting",
+  failures: 0,
   decision: null,
   payout: null,
 };

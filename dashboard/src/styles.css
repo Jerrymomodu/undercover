@@ -174,12 +174,14 @@ p {
 }
 
 .status-decided,
-.decision-approve {
+.decision-approve,
+.todo-done {
   background: var(--sea-green);
 }
 
 .status-in_progress,
-.decision-refer {
+.decision-refer,
+.todo-in_progress {
   background: var(--marigold);
 }
 
@@ -188,14 +190,63 @@ p {
   background: var(--coral);
 }
 
-.status-waiting {
+.status-waiting,
+.todo-to_do {
   background: var(--cerulean);
   color: #ffffff;
 }
 
+.status-left_for_handler,
+.todo-for_handler {
+  background: var(--raspberry);
+  color: #ffffff;
+}
+
+.run {
+  margin-bottom: 20px;
+}
+
+.run-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.run-heading h2 {
+  margin: 0;
+}
+
+.todos {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.todos li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.todos .chip {
+  min-width: 9.5rem;
+  text-align: center;
+}
+
+.summary {
+  margin: 16px 0 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--inset);
+}
+
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 16px;
   margin-bottom: 20px;
 }
@@ -204,6 +255,8 @@ p {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
 }
 
 .tile-count {
