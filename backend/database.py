@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -35,7 +36,8 @@ CREATE TABLE claims (
     customer_id TEXT NOT NULL REFERENCES customers,
     record TEXT NOT NULL,
     status TEXT NOT NULL,
-    thread_id TEXT
+    thread_id TEXT,
+    failures INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE decisions (
     claim_id TEXT PRIMARY KEY REFERENCES claims,
@@ -59,9 +61,31 @@ CREATE TABLE steps (
     content TEXT NOT NULL,
     created_at TEXT NOT NULL
 );
+CREATE TABLE sections (
+    document TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY (document, number)
+);
+CREATE TABLE runs (
+    run_id TEXT PRIMARY KEY,
+    cap INTEGER,
+    started_at TEXT NOT NULL,
+    finished_at TEXT,
+    summary TEXT
+);
+CREATE TABLE todos (
+    run_id TEXT NOT NULL REFERENCES runs,
+    position INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    status TEXT NOT NULL,
+    PRIMARY KEY (run_id, position)
+);
 CREATE VIEW claim_view AS
 SELECT
     claims.claim_id, claims.record, claims.status, claims.thread_id,
+    claims.failures,
     customers.name AS customer_name,
     decisions.decision, decisions.payout, decisions.section, decisions.reason,
     decisions.decided_at,
@@ -71,6 +95,9 @@ JOIN customers USING (customer_id)
 LEFT JOIN decisions USING (claim_id)
 LEFT JOIN payments USING (claim_id);
 """
+
+
+DOCUMENTS = {"policy_wording": "policy_wording.md", "claims_manual": "claims_manual.md"}
 
 
 def database_path() -> Path:
@@ -88,6 +115,16 @@ def connect() -> sqlite3.Connection:
 def load(name: str) -> Any:
     """Read one of the JSON files in data/."""
     return json.loads((DATA / name).read_text(encoding="utf-8"))
+
+
+def split_sections(text: str) -> list[tuple[int, str, str]]:
+    """Split a document at its ## headings; the text before the first is section 0."""
+    intro, *parts = re.split(r"^## ", text, flags=re.MULTILINE)
+    found = [(0, intro.splitlines()[0].removeprefix("# "), intro.strip())]
+    for part in parts:
+        number, _, title = part.splitlines()[0].partition(". ")
+        found.append((int(number), title, f"## {part}".strip()))
+    return found
 
 
 def seed(path: Path) -> dict[str, int]:
@@ -121,9 +158,15 @@ def seed(path: Path) -> dict[str, int]:
             [(p["policy_id"], json.dumps(p)) for p in policies],
         )
         connection.executemany(
-            "INSERT INTO claims VALUES (?, ?, ?, 'waiting', NULL)",
+            "INSERT INTO claims VALUES (?, ?, ?, 'waiting', NULL, 0)",
             [(c["claim_id"], c["customer_id"], json.dumps(c)) for c in claims],
         )
+        for document, name in DOCUMENTS.items():
+            text = (DATA / name).read_text(encoding="utf-8")
+            connection.executemany(
+                "INSERT INTO sections VALUES (?, ?, ?, ?)",
+                [(document, *section) for section in split_sections(text)],
+            )
     return {
         "claims": len(claims),
         "policies": len(policies),

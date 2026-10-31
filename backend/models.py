@@ -4,9 +4,13 @@ from typing import Literal, Self
 
 from pydantic import BaseModel, Field, model_validator
 
-Status = Literal["waiting", "in_progress", "waiting_for_sign_off", "decided"]
+Status = Literal[
+    "waiting", "in_progress", "waiting_for_sign_off", "decided", "left_for_handler"
+]
 DecisionKind = Literal["approve", "decline", "refer"]
-StepKind = Literal["tool_call", "tool_result", "message"]
+StepKind = Literal["tool_call", "tool_result", "message", "reading", "error"]
+DocumentName = Literal["policy_wording", "claims_manual"]
+TodoStatus = Literal["to_do", "in_progress", "done", "for_handler"]
 
 
 class Item(BaseModel):
@@ -43,6 +47,7 @@ class ClaimSummary(BaseModel):
     amount_claimed: float
     submitted_on: str
     status: Status
+    failures: int
     decision: DecisionKind | None
     payout: float | None
 
@@ -62,6 +67,7 @@ class Claim(BaseModel):
     amount_claimed: float
     documents: list[Document]
     status: Status
+    failures: int
     thread_id: str | None
     decision: Decision | None
     payment: Payment | None
@@ -115,6 +121,32 @@ class Instructions(BaseModel):
     text: str
 
 
+class SectionSummary(BaseModel):
+    number: int
+    title: str
+
+
+class Section(BaseModel):
+    document: DocumentName
+    number: int
+    title: str
+    text: str
+
+
+class Todo(BaseModel):
+    content: str = Field(min_length=1)
+    status: TodoStatus
+
+
+class Run(BaseModel):
+    run_id: str
+    cap: int | None
+    started_at: str
+    finished_at: str | None
+    summary: str | None
+    todos: list[Todo]
+
+
 class StartRequest(BaseModel):
     thread_id: str = Field(min_length=1)
 
@@ -152,3 +184,22 @@ class PaymentRequest(BaseModel):
 
 class SignOffRequest(BaseModel):
     handler_id: str
+
+
+class ReleaseRequest(BaseModel):
+    reason: str = Field(min_length=1, description="Why the attempt failed")
+
+
+class RunRequest(BaseModel):
+    run_id: str = Field(min_length=1)
+    cap: int | None = Field(
+        ge=1, description="The most claims the run may start, or null for all"
+    )
+
+
+class TodosRequest(BaseModel):
+    todos: list[Todo]
+
+
+class FinishRequest(BaseModel):
+    summary: str = Field(min_length=1, description="A short summary for the handlers")

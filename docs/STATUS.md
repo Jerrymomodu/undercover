@@ -18,3 +18,9 @@ The claims pilot in `docs/PLAN.md` is built: all six phases are done.
 ## Last live run
 
 On September 27, 2026, `uv run -m agent` with `openai/gpt-6-luna` worked all 25 claims in 2 minutes 47 seconds: 17 approve, 5 decline and 3 refer. Three approvals were over $1,000 and waited for sign-off (CLM-1003, CLM-1008 and CLM-1011), and every other approval was paid its payout. These decisions have not yet been scored against the handlers' decisions in `data/evals/`.
+
+## The harness, in progress
+
+`docs/PLAN_HARNESS.md` is being built.
+
+- Phase 1, done: the backend splits the policy wording and the claims manual into sections (`list_sections`, `read_section`), counts each claim's failed attempts with `release_claim` (the second failure leaves a claim `left_for_handler`), and stores agent runs with their to-do lists (`start_run`, `get_current_run`, `write_todos`, `finish_run`). Steps can now be `reading` or `error`.

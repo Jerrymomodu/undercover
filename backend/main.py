@@ -16,19 +16,29 @@ from backend.models import (
     ClaimSummary,
     Decision,
     DecisionRequest,
+    DocumentName,
+    FinishRequest,
     Handler,
     Instructions,
     Payment,
     PaymentRequest,
     Policy,
     PreviousClaim,
+    ReleaseRequest,
+    Run,
+    RunRequest,
+    Section,
+    SectionSummary,
     SignOffRequest,
     StartRequest,
     Step,
     StepRequest,
+    Todo,
+    TodosRequest,
 )
 
 INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+MAX_FAILURES = 2
 
 
 @asynccontextmanager
@@ -82,6 +92,7 @@ def to_summary(row: sqlite3.Row) -> ClaimSummary:
         **json.loads(row["record"])
         | {
             "status": row["status"],
+            "failures": row["failures"],
             "customer_name": row["customer_name"],
             "decision": row["decision"],
             "payout": row["payout"],
@@ -101,6 +112,7 @@ def to_claim(row: sqlite3.Row) -> Claim:
         **json.loads(row["record"])
         | {
             "status": row["status"],
+            "failures": row["failures"],
             "customer_name": row["customer_name"],
             "thread_id": row["thread_id"],
             "decision": decision,
@@ -119,6 +131,26 @@ def pay(
         (claim_id, payment.amount, payment.paid_at, payment.signed_off_by),
     )
     return payment
+
+
+def find_run(db: sqlite3.Connection, run_id: str) -> Run:
+    """Return one run with its to-do list, or raise a 404."""
+    row = db.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    todos = db.execute(
+        "SELECT content, status FROM todos WHERE run_id = ? ORDER BY position",
+        (run_id,),
+    ).fetchall()
+    return Run(**dict(row), todos=[Todo(**dict(todo)) for todo in todos])
+
+
+def find_open_run(db: sqlite3.Connection, run_id: str) -> Run:
+    """Return a run that hasn't finished, or raise a 404 or 409."""
+    run = find_run(db, run_id)
+    if run.finished_at is not None:
+        raise HTTPException(409, f"Run {run_id} has finished")
+    return run
 
 
 @app.get("/api/health", operation_id="health")
@@ -272,3 +304,89 @@ def sign_off_claim(claim_id: str, request: SignOffRequest, db: Database) -> Clai
     pay(db, claim_id, claim["payout"], handler.name)
     db.execute("UPDATE claims SET status = 'decided' WHERE claim_id = ?", (claim_id,))
     return to_claim(find_claim(db, claim_id))
+
+
+@app.post("/api/claims/{claim_id}/release", operation_id="release_claim")
+def release_claim(claim_id: str, request: ReleaseRequest, db: Database) -> Claim:
+    """Put a claim that failed before its decision back in the queue, or leave it."""
+    claim = find_claim(db, claim_id)
+    if claim["status"] != "in_progress" or claim["decision"] is not None:
+        raise HTTPException(409, f"Claim {claim_id} is not in progress and undecided")
+    failures = claim["failures"] + 1
+    status = "left_for_handler" if failures >= MAX_FAILURES else "waiting"
+    db.execute(
+        "INSERT INTO steps (claim_id, thread_id, kind, content, created_at)"
+        " VALUES (?, ?, 'error', ?, ?)",
+        (claim_id, claim["thread_id"], request.reason, now()),
+    )
+    db.execute(
+        "UPDATE claims SET status = ?, failures = ? WHERE claim_id = ?",
+        (status, failures, claim_id),
+    )
+    return to_claim(find_claim(db, claim_id))
+
+
+@app.get("/api/documents/{document}/sections", operation_id="list_sections")
+def list_sections(document: DocumentName, db: Database) -> list[SectionSummary]:
+    """List the sections of the policy wording or the claims manual."""
+    rows = db.execute(
+        "SELECT number, title FROM sections WHERE document = ? ORDER BY number",
+        (document,),
+    ).fetchall()
+    return [SectionSummary(**dict(row)) for row in rows]
+
+
+@app.get("/api/documents/{document}/sections/{number}", operation_id="read_section")
+def read_section(document: DocumentName, number: int, db: Database) -> Section:
+    """Read one section of the policy wording or the claims manual."""
+    row = db.execute(
+        "SELECT * FROM sections WHERE document = ? AND number = ?", (document, number)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(404, f"Section {number} of {document} not found")
+    return Section(**dict(row))
+
+
+@app.post("/api/runs", operation_id="start_run")
+def start_run(request: RunRequest, db: Database) -> Run:
+    """Start a run of the agent over the queue, capped at a number of claims."""
+    if db.execute("SELECT 1 FROM runs WHERE run_id = ?", (request.run_id,)).fetchone():
+        raise HTTPException(409, f"Run {request.run_id} already exists")
+    db.execute(
+        "INSERT INTO runs (run_id, cap, started_at) VALUES (?, ?, ?)",
+        (request.run_id, request.cap, now()),
+    )
+    return find_run(db, request.run_id)
+
+
+@app.get("/api/runs/current", operation_id="get_current_run")
+def get_current_run(db: Database) -> Run | None:
+    """Get the latest run with its to-do list, or null before the first run."""
+    row = db.execute("SELECT run_id FROM runs ORDER BY rowid DESC").fetchone()
+    return None if row is None else find_run(db, row["run_id"])
+
+
+@app.put("/api/runs/{run_id}/todos", operation_id="write_todos")
+def write_todos(run_id: str, request: TodosRequest, db: Database) -> Run:
+    """Replace a run's to-do list."""
+    find_open_run(db, run_id)
+    db.execute("DELETE FROM todos WHERE run_id = ?", (run_id,))
+    db.executemany(
+        "INSERT INTO todos VALUES (?, ?, ?, ?)",
+        [
+            (run_id, position, todo.content, todo.status)
+            for position, todo in enumerate(request.todos)
+        ],
+    )
+    return find_run(db, run_id)
+
+
+@app.post("/api/runs/{run_id}/finish", operation_id="finish_run")
+def finish_run(run_id: str, request: FinishRequest, db: Database) -> Run:
+    """Finish a run with a summary for the handlers."""
+    find_open_run(db, run_id)
+    db.execute(
+        "UPDATE runs SET finished_at = ?, summary = ? WHERE run_id = ?",
+        (now(), request.summary, run_id),
+    )
+    return find_run(db, run_id)
