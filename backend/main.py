@@ -37,7 +37,7 @@ from backend.models import (
     TodosRequest,
 )
 
-INSTRUCTIONS = Path(__file__).parent / "instructions.md"
+INSTRUCTIONS = Path(__file__).parent / "instructions"
 MAX_FAILURES = 2
 
 
@@ -197,10 +197,9 @@ def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
 
 
 @app.get("/api/instructions", operation_id="get_instructions")
-def get_instructions(db: Database) -> Instructions:
-    """Get the agent's instructions, followed by the policy wording."""
-    wording = db.execute("SELECT policy_wording FROM settings").fetchone()[0]
-    return Instructions(text=f"{INSTRUCTIONS.read_text(encoding='utf-8')}\n{wording}")
+def get_instructions() -> Instructions:
+    """Get the agent's instructions for working a claim."""
+    return Instructions(text=(INSTRUCTIONS / "claim.md").read_text(encoding="utf-8"))
 
 
 @app.get("/api/handlers", operation_id="list_handlers")

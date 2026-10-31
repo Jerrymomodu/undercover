@@ -139,20 +139,20 @@ Add the `sections` table and seeding, `list_sections` and `read_section`, the `f
 
 Move the instructions to `backend/instructions/claim.md` and rewrite them from the wording and the manual. Add the `list_sections` and `read_section` tools and the `reading` step. Add the retry and call-limit middleware and the model timeout. Build `work_claim`, which starts a claim, runs a fresh claim agent and returns one line, releasing the claim on any failure. Switch the default model. `uv run -m agent CLM-1001` uses `work_claim`.
 
-- [ ] A pytest test checks that the claim agent's tools are exactly `get_claim`, `get_policy`, `get_claim_history`, `list_sections`, `read_section`, `record_decision` and `pay_claim`, each named after a backend operation
-- [ ] `curl -s localhost:8000/api/instructions` no longer contains "## 10. How we work out your payment": the wording is looked up, not handed over
-- [ ] Stub model test: the stub lists the wording's sections, reads sections 1 and 3, reads manual section 10, then decides and pays. The claim is decided and paid, and has `reading` steps "Policy wording, section 1: Your plan", "Policy wording, section 3: Trip Delay" and "Claims manual, section 10: Meals without receipts" in order
-- [ ] Stub model test: reading an unknown section returns the refusal to the model, records no `reading` step, and the run carries on
-- [ ] `work_claim` test: a decided claim gives a line like `CLM-1001  approve  $420.00  paid`, and an approval over the limit gives `waiting for sign-off`
-- [ ] `work_claim` test: a claim agent that raises leaves the claim `waiting` with `failures` 1 and an `error` step, and the line says it is back in the queue. A second failure leaves it `left_for_handler`, and the line says so
-- [ ] `work_claim` test: a claim agent that ends without a decision is released the same way
-- [ ] `work_claim` test: a claim that isn't waiting gives a line saying so and changes nothing
-- [ ] Stub model test: a model that fails on its first call and succeeds on the retry works the claim with no failure counted
-- [ ] Stub model test: a model that never stops calling tools hits the call limit, and the claim is released
-- [ ] A test checks the default model is `deepseek/deepseek-v4.1-flash` with low reasoning effort, and that `MODEL_NAME` overrides it
-- [ ] `grep -rn "data/" agent` finds nothing: the agent reads nothing from disk
-- [ ] Live: after reseeding, `uv run -m agent CLM-1001` prints `CLM-1001  approve  $420.00  paid`, and its steps include `list_sections` and `read_section` calls and at least one `reading` step
-- [ ] `npm run check` passes
+- [x] A pytest test checks that the claim agent's tools are exactly `get_claim`, `get_policy`, `get_claim_history`, `list_sections`, `read_section`, `record_decision` and `pay_claim`, each named after a backend operation
+- [x] `curl -s localhost:8000/api/instructions` no longer contains "## 10. How we work out your payment": the wording is looked up, not handed over
+- [x] Stub model test: the stub lists the wording's sections, reads sections 1 and 3, reads manual section 10, then decides and pays. The claim is decided and paid, and has `reading` steps "Policy wording, section 1: Your plan", "Policy wording, section 3: Trip Delay" and "Claims manual, section 10: Meals without receipts" in order
+- [x] Stub model test: reading an unknown section returns the refusal to the model, records no `reading` step, and the run carries on
+- [x] `work_claim` test: a decided claim gives a line like `CLM-1001  approve  $420.00  paid`, and an approval over the limit gives `waiting for sign-off`
+- [x] `work_claim` test: a claim agent that raises leaves the claim `waiting` with `failures` 1 and an `error` step, and the line says it is back in the queue. A second failure leaves it `left_for_handler`, and the line says so
+- [x] `work_claim` test: a claim agent that ends without a decision is released the same way
+- [x] `work_claim` test: a claim that isn't waiting gives a line saying so and changes nothing
+- [x] Stub model test: a model that fails on its first call and succeeds on the retry works the claim with no failure counted
+- [x] Stub model test: a model that never stops calling tools hits the call limit, and the claim is released
+- [x] A test checks the default model is `deepseek/deepseek-v4.1-flash` with low reasoning effort, and that `MODEL_NAME` overrides it
+- [x] `grep -rn "data/" agent` finds nothing: the agent reads nothing from disk
+- [x] Live: after reseeding, `uv run -m agent CLM-1001` prints `CLM-1001  approve  $420.00  paid`, and its steps include `list_sections` and `read_section` calls and at least one `reading` step
+- [x] `npm run check` passes
 
 ## Phase 3: The queue agent: the plan, the cap and the finish
 
