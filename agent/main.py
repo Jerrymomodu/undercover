@@ -99,7 +99,7 @@ def steps(message: AnyMessage) -> list[tuple[str, str]]:
 
 def run(claim_id: str, thread_id: str, llm: BaseChatModel | None = None) -> str:
     """Work a started claim with a fresh claim agent, recording each step."""
-    instructions = call_backend("GET", "/api/instructions")["text"]
+    instructions = call_backend("GET", "/api/instructions")["claim"]
     agent = create_agent(
         llm or model(),
         tools=CLAIM_TOOLS,
@@ -173,13 +173,3 @@ def work_claim(claim_id: str, llm: BaseChatModel | None = None) -> str:
     if claim["decision"] is not None:
         return f"{claim_id}  {outcome(claim)}"
     return f"{claim_id}  {release(claim_id, failure)}"
-
-
-def work_queue() -> None:
-    """Work every waiting claim in queue order, printing a line for each."""
-    worked = 0
-    for claim in call_backend("GET", "/api/claims"):
-        if claim["status"] == "waiting":
-            print(work_claim(claim["claim_id"]), flush=True)
-            worked += 1
-    print(f"Worked {worked} claims")

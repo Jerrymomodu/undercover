@@ -158,19 +158,19 @@ Move the instructions to `backend/instructions/claim.md` and rewrite them from t
 
 Write `backend/instructions/queue.md`. Build the queue agent with `list_claims`, `write_todos`, `work_claim` and `finish_run`, retry middleware and a call limit scaled to the cap, and a recursion limit large enough for a full queue. Add `uv run -m agent` and `--cap`. `get_instructions` returns both sets of instructions, and the instructions page shows them. Remove the pilot's `work_queue` loop.
 
-- [ ] A pytest test checks that the queue agent's tools are exactly `list_claims`, `write_todos`, `work_claim` and `finish_run`
-- [ ] Stub model test, a whole run on three waiting claims: the queue agent writes its to-do list, works each claim through a claim agent, ticks each item off and finishes. The backend holds the run with each version of the list as it was written and the summary; the three claims are decided; the output is one line per claim, then the summary
-- [ ] Stub model test, the cap: with cap 2 and three waiting claims, a third `work_claim` is refused with a message about the cap, that claim stays `waiting`, and `finish_run` is accepted
-- [ ] Stub model test, a failure doesn't stop the run: the claim agent raises on the first claim, and the other two are still decided and the run finishes
-- [ ] Stub model test, a retry: a claim fails, goes back in the queue, is worked again later in the same run and is decided, with `failures` 1. The retry doesn't count against the cap
-- [ ] Stub model test, two failures: the claim is `left_for_handler` and the stub marks its item `for_handler`
-- [ ] Stub model test, the check for missed claims: `finish_run` with a waiting claim under the cap is refused and names the claim; the stub works it, and `finish_run` is then accepted
-- [ ] Stub model test: when the queue agent itself raises, the run is finished with a summary that says it stopped, and no claim is left in progress
-- [ ] Test: a claim left in progress with no decision by an earlier run is `waiting` with `failures` 1 and an `error` step once the next run starts
-- [ ] `curl -s localhost:8000/api/instructions` returns `queue` and `claim`
-- [ ] vitest and the browser: `/instructions` shows "Running the queue" and "Working a claim", with no text box, input or edit button
-- [ ] `uv run -m agent --help` shows the cap and the claim id
-- [ ] `npm run check` passes
+- [x] A pytest test checks that the queue agent's tools are exactly `list_claims`, `write_todos`, `work_claim` and `finish_run`
+- [x] Stub model test, a whole run on three waiting claims: the queue agent writes its to-do list, works each claim through a claim agent, ticks each item off and finishes. Each `write_todos` reaches the backend, which holds the run with its latest list and the summary; the three claims are decided; the output is one line per claim, then the summary
+- [x] Stub model test, the cap: with cap 2 and three waiting claims, a third `work_claim` is refused with a message about the cap, that claim stays `waiting`, and `finish_run` is accepted
+- [x] Stub model test, a failure doesn't stop the run: the claim agent raises on the first claim, and the other two are still decided and the run finishes
+- [x] Stub model test, a retry: a claim fails, goes back in the queue, is worked again later in the same run and is decided, with `failures` 1. The retry doesn't count against the cap
+- [x] Stub model test, two failures: the claim is `left_for_handler` and the stub marks its item `for_handler`
+- [x] Stub model test, the check for missed claims: `finish_run` with a waiting claim under the cap is refused and names the claim; the stub works it, and `finish_run` is then accepted
+- [x] Stub model test: when the queue agent itself raises, the run is finished with a summary that says it stopped, and no claim is left in progress
+- [x] Test: a claim left in progress with no decision by an earlier run is `waiting` with `failures` 1 and an `error` step once the next run starts
+- [x] `curl -s localhost:8000/api/instructions` returns `queue` and `claim`
+- [x] vitest and the browser: `/instructions` shows "Running the queue" and "Working a claim", with no text box, input or edit button
+- [x] `uv run -m agent --help` shows the cap and the claim id
+- [x] `npm run check` passes
 
 ## Phase 4: Dashboard: the run and its to-do list
 

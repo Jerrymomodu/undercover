@@ -86,7 +86,9 @@ def test_tools_are_named_after_backend_operations(client):
 
 
 def test_get_instructions(client):
-    text = client.get("/api/instructions").json()["text"]
+    instructions = client.get("/api/instructions").json()
+    assert instructions["queue"].startswith("# UnderCover Agent: running the queue")
+    text = instructions["claim"]
     assert text.startswith("# UnderCover Agent: working a claim")
     assert "read_section" in text
     assert "## 10. How we work out your payment" not in text
@@ -184,7 +186,7 @@ def test_run_uses_the_instructions_from_the_backend(client):
     main.run("CLM-1003", "thread-1", stub)
     system = stub.prompts[0][0]
     assert isinstance(system, SystemMessage)
-    assert system.content == client.get("/api/instructions").json()["text"]
+    assert system.content == client.get("/api/instructions").json()["claim"]
 
 
 def test_payment_over_the_limit_is_refused(client):

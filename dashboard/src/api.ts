@@ -145,7 +145,8 @@ export const api = {
     request<PreviousClaim[]>(
       `/api/customers/${encodeURIComponent(customerId)}/claims`,
     ),
-  getInstructions: () => request<{ text: string }>("/api/instructions"),
+  getInstructions: () =>
+    request<{ queue: string; claim: string }>("/api/instructions"),
   listHandlers: () => request<Handler[]>("/api/handlers"),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),
