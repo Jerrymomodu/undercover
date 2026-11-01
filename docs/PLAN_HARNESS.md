@@ -69,7 +69,7 @@ Each failure goes back to the queue agent as a line such as `CLM-1007 failed: mo
 
 The harness keeps track of the claims each run has started. Once a run has started as many different claims as its cap, `work_claim` refuses a new one and says so, and the claim stays waiting. Trying a failed claim again doesn't count against the cap. Parallel calls to `work_claim` take a lock and run one after another, so the cap and SQLite are never raced.
 
-`finish_run(summary)` is the queue agent's last tool. Before it records the summary, the harness lists the waiting claims. If any remain and the run is still under its cap, it refuses with their ids, and the agent goes back to work. So the check for missed claims is enforced, not just asked for.
+`finish_run(summary)` is the queue agent's last tool. Before it records the summary, the harness lists the waiting claims. If any remain and the run is still under its cap, it refuses with their ids, and the agent goes back to work. So the check for missed claims is enforced, not just asked for. When it accepts, the harness marks any to-do item still in progress done before finishing the run, since finishing is what completes it: in the first live trial the model left "Write the summary" in progress, and a finished run's list can't change.
 
 ### API
 
@@ -199,13 +199,13 @@ Add the "What the agent read" panel, the `reading` and `error` steps, and the le
 
 Update `docs/SPEC.md` (decisions follow the manual as well as the wording; the manual leaves "Not for now"; the to-do list and the new state are among what the team sees), `docs/TECH_STACK.md` (the default model, the two agents and the entry points) and `docs/STATUS.md`. Then run the live trial the brief asks for.
 
-- [ ] Live, in the browser: after reseeding, with `npm run dev` running and the queue open, `uv run -m agent --cap 5` runs to the end. Snapshots taken during the run show the to-do list appearing, items moving to In progress and then Done, and the page ends on Finished with the summary
-- [ ] Live: afterwards, `curl -s localhost:8000/api/claims` shows exactly five claims worked (decided, waiting for sign-off or left for a handler), 20 `waiting` and none `in_progress`
-- [ ] Live: every decision has a section and a reason of two or three sentences; every approval over $1,000 is waiting for sign-off with no payment, and every other approval is paid exactly its payout
-- [ ] Live, in the browser: each of the five claim pages shows its steps and at least one section in "What the agent read"
-- [ ] `docs/SPEC.md`, `docs/TECH_STACK.md` and `docs/STATUS.md` describe the product as it now is, and `docs/STATUS.md` records the live run
-- [ ] `grep -rn evals backend agent dashboard/src` finds nothing
-- [ ] `npm run check` passes
+- [x] Live, in the browser: after reseeding, with `npm run dev` running and the queue open, `uv run -m agent --cap 5` runs to the end. Snapshots taken during the run show the to-do list appearing, items moving to In progress and then Done, and the page ends on Finished with the summary
+- [x] Live: afterwards, `curl -s localhost:8000/api/claims` shows exactly five claims worked (decided, waiting for sign-off or left for a handler), 20 `waiting` and none `in_progress`
+- [ ] Live: every decision has a section and a reason of two or three sentences; every approval over $1,000 is waiting for sign-off with no payment, and every other approval is paid exactly its payout. Not met: CLM-1018's referral reason ran to four sentences. The claim instructions now say "never more", not yet tried live. Every decision has a section, and the payments are right
+- [x] Live, in the browser: each of the five claim pages shows its steps and at least one section in "What the agent read"
+- [x] `docs/SPEC.md`, `docs/TECH_STACK.md` and `docs/STATUS.md` describe the product as it now is, and `docs/STATUS.md` records the live run
+- [x] `grep -rn evals backend agent dashboard/src` finds nothing
+- [x] `npm run check` passes
 
 ## Not in this plan
 

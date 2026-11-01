@@ -192,6 +192,24 @@ def test_finishing_checks_for_missed_claims(client, three_waiting):
     assert "waiting" not in statuses(client).values()
 
 
+def test_finishing_ticks_off_the_summary(client, three_waiting):
+    stub = queue_agent(
+        *work("CLM-1001"),
+        todos(
+            ("CLM-1001", "done"),
+            ("CLM-1002", "to_do"),
+            ("Write the summary", "in_progress"),
+        ),
+        finish(),
+    )
+    work_queue(1, stub, models())
+    assert [t["status"] for t in current_run(client)["todos"]] == [
+        "done",
+        "to_do",
+        "done",
+    ]
+
+
 def test_a_run_that_stops(client, three_waiting):
     summary = work_queue(None, BrokenModel(messages=iter([])), models())
     assert summary == "The run stopped: RuntimeError: The model provider is unavailable"

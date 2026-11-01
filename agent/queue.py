@@ -78,8 +78,17 @@ class QueueRun:
                 f"Not finished: {len(missed)} claims are still waiting within the"
                 f" run's cap: {', '.join(missed)}. Work them, then finish."
             )
+        self.tick_off()
         self.record(summary)
         return "The run is finished."
+
+    def tick_off(self) -> None:
+        """Mark items still in progress done, since finishing completes them."""
+        todos = call_backend("GET", "/api/runs/current")["todos"]
+        for todo in todos:
+            if todo["status"] == "in_progress":
+                todo["status"] = "done"
+        call_backend("PUT", f"/api/runs/{self.run_id}/todos", {"todos": todos})
 
     def record(self, summary: str) -> str:
         """Record the run's summary with the backend."""

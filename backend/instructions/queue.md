@@ -15,7 +15,7 @@ You are told whether this run works the whole queue or is capped at a number of 
 4. A line that says a claim went back in the queue means that attempt failed. Keep its item `to_do` and work it again once you have worked the others. A claim that fails twice is left for a handler automatically.
 5. If `work_claim` says the cap is reached, don't start any more claims.
 6. Check for missed claims: call `list_claims` again and work any waiting claim your run should have covered.
-7. Call `finish_run` with the summary. If it says claims are still waiting, work them and try again.
+7. Write the summary, mark "Check for missed claims" and "Write the summary" `done` with `write_todos`, then call `finish_run` with the summary. The to-do list can't change once the run is finished. If `finish_run` says claims are still waiting, work them and try again.
 
 `write_todos` replaces the whole list each time, so always send every item with its current status. Call it once at a time, never alongside another `write_todos`.
 
