@@ -1,0 +1,13 @@
+[
+  {"po_number": "PO-1001", "received_on": "2026-10-28", "lines": [{"sku": "PAP-A4", "qty": 40}, {"sku": "PEN-BLK", "qty": 10}]},
+  {"po_number": "PO-1002", "received_on": "2026-10-27", "lines": [{"sku": "LAP-14", "qty": 8}]},
+  {"po_number": "PO-1003", "received_on": "2026-10-29", "lines": [{"sku": "TON-HP", "qty": 20}]},
+  {"po_number": "PO-1004", "received_on": "2026-10-30", "lines": [{"sku": "MON-27", "qty": 18}]},
+  {"po_number": "PO-1005", "received_on": "2026-10-26", "lines": [{"sku": "CHR-ERG", "qty": 12}]},
+  {"po_number": "PO-1006", "received_on": "2026-10-24", "lines": [{"sku": "SRV-R7", "qty": 4}]},
+  {"po_number": "PO-1007", "received_on": "2026-10-31", "lines": [{"sku": "DSK-STD", "qty": 20}]},
+  {"po_number": "PO-1008", "received_on": "2026-10-29", "lines": [{"sku": "ENV-C5", "qty": 30}]},
+  {"po_number": "PO-1009", "received_on": "2026-10-22", "lines": [{"sku": "BRO-A5", "qty": 5}]},
+  {"po_number": "PO-1010", "received_on": "2026-10-28", "lines": [{"sku": "DOC-USB", "qty": 25}]},
+  {"po_number": "PO-1011", "received_on": "2026-10-30", "lines": [{"sku": "STK-NOTE", "qty": 50}]}
+]

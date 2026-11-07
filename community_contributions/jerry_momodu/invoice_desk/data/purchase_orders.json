@@ -1,0 +1,36 @@
+[
+  {"po_number": "PO-1001", "vendor_id": "V01", "lines": [
+    {"sku": "PAP-A4", "description": "A4 copier paper, box of 5 reams", "qty": 40, "unit_price": 22.50},
+    {"sku": "PEN-BLK", "description": "Black ballpoint pens, box of 50", "qty": 10, "unit_price": 8.00}
+  ]},
+  {"po_number": "PO-1002", "vendor_id": "V03", "lines": [
+    {"sku": "LAP-14", "description": "14-inch business laptop", "qty": 8, "unit_price": 1450.00}
+  ]},
+  {"po_number": "PO-1003", "vendor_id": "V01", "lines": [
+    {"sku": "TON-HP", "description": "HP toner cartridge 85A", "qty": 20, "unit_price": 64.00}
+  ]},
+  {"po_number": "PO-1004", "vendor_id": "V03", "lines": [
+    {"sku": "MON-27", "description": "27-inch monitor", "qty": 30, "unit_price": 210.00}
+  ]},
+  {"po_number": "PO-1005", "vendor_id": "V01", "lines": [
+    {"sku": "CHR-ERG", "description": "Office chair (ergonomic) - black", "qty": 12, "unit_price": 185.00}
+  ]},
+  {"po_number": "PO-1006", "vendor_id": "V03", "lines": [
+    {"sku": "SRV-R7", "description": "Rack server R7", "qty": 4, "unit_price": 9500.00}
+  ]},
+  {"po_number": "PO-1007", "vendor_id": "V07", "lines": [
+    {"sku": "DSK-STD", "description": "Standing desk 160cm", "qty": 20, "unit_price": 400.00}
+  ]},
+  {"po_number": "PO-1008", "vendor_id": "V01", "lines": [
+    {"sku": "ENV-C5", "description": "C5 envelopes, box of 500", "qty": 30, "unit_price": 18.00}
+  ]},
+  {"po_number": "PO-1009", "vendor_id": "V05", "lines": [
+    {"sku": "BRO-A5", "description": "A5 brochures, pack of 1,000", "qty": 5, "unit_price": 120.00}
+  ]},
+  {"po_number": "PO-1010", "vendor_id": "V03", "lines": [
+    {"sku": "DOC-USB", "description": "USB-C docking station", "qty": 25, "unit_price": 120.00}
+  ]},
+  {"po_number": "PO-1011", "vendor_id": "V01", "lines": [
+    {"sku": "STK-NOTE", "description": "Sticky notes, pack of 24", "qty": 50, "unit_price": 12.00}
+  ]}
+]

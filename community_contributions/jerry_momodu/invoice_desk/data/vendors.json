@@ -1,0 +1,9 @@
+[
+  {"id": "V01", "name": "Northwind Office Supplies", "category": "office_supplies", "status": "active", "bank_account": "GB11NWBK60161331926801", "bank_changed_on": null},
+  {"id": "V02", "name": "Brightline Utilities", "category": "utilities", "status": "active", "bank_account": "GB22BARC20035362719244", "bank_changed_on": null},
+  {"id": "V03", "name": "Keystone IT Hardware", "category": "it_hardware", "status": "active", "bank_account": "GB33LOYD30963461728830", "bank_changed_on": null},
+  {"id": "V04", "name": "Harbor Consulting Ltd", "category": "consulting", "status": "active", "bank_account": "GB44HSBC40051512345678", "bank_changed_on": null},
+  {"id": "V05", "name": "Quickprint Ltd", "category": "printing", "status": "blocked", "bank_account": "GB55MIDL40071598765432", "bank_changed_on": null},
+  {"id": "V06", "name": "Cloudnest Software", "category": "software", "status": "active", "bank_account": "GB66NWBK60161398765432", "bank_changed_on": null},
+  {"id": "V07", "name": "Atlas Furniture Co", "category": "furniture", "status": "active", "bank_account": "GB77BARC20039512345678", "bank_changed_on": "2026-10-20"}
+]

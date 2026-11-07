@@ -1,0 +1,17 @@
+{
+  "INV-001": {"accept": ["approved"], "why": "Clean match under £5,000"},
+  "INV-002": {"accept": ["approved"], "why": "Clean match above £5,000, confirmed by the reviewer"},
+  "INV-003": {"accept": ["rejected"], "why": "Duplicate of INV-001"},
+  "INV-004": {"accept": ["rejected"], "why": "Vendor is blocked"},
+  "INV-005": {"accept": ["for_review"], "why": "Bank account differs from the vendor's record"},
+  "INV-006": {"accept": ["approved"], "why": "Price 1.6% over the PO, within tolerance"},
+  "INV-007": {"accept": ["for_review"], "why": "Price 8% over the PO with no amended PO"},
+  "INV-008": {"accept": ["rejected"], "why": "Bills 30 monitors when 18 were received"},
+  "INV-009": {"accept": ["approved"], "why": "No SKU, but the description names the PO's chair"},
+  "INV-010": {"accept": ["approved"], "why": "Utilities invoice under £1,000 without a PO"},
+  "INV-011": {"accept": ["rejected"], "why": "Consulting without a PO"},
+  "INV-012": {"accept": ["for_review"], "why": "Above the £25,000 limit"},
+  "INV-013": {"accept": ["rejected"], "why": "Lines add up to £600, total says £660"},
+  "INV-014": {"accept": ["for_review", "rejected"], "why": "Software without a PO, and pressure to skip checks"},
+  "INV-015": {"accept": ["for_review"], "why": "Vendor's bank account changed 14 days before the invoice"}
+}
