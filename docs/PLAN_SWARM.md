@@ -13,7 +13,7 @@ When it's done, a handler starts a dispatch from the queue page and chooses how 
 The backend:
 
 - `database.py`: the tables, the engine and seeding, as today. The tables change: the runs table now holds dispatches and evaluations, and new tables hold each run's claims, the model calls, the agent's work times, the held-out claims and the answer key. The to-do table goes. Seeding also reads the three files in `data/evals/` (the brief allows this), into the answer key and held-out tables only.
-- `scoring.py` (new): one job. It works out an evaluation's measures from the backend's records and the answer key. It holds the costs of mistakes ($1,500 and $50) and the dollar of leeway on a payout, and it uses `models.py` and nothing else. No claim operation imports it.
+- `scoring.py` (new): one job. It works out an evaluation's measures from the backend's records and the answer key. It holds the costs of mistakes ($1,500 and $50) and the dollar of leeway on a payout, and it uses `database.py` for the tables and `models.py`. It is the only module that reads the answer key; creating an evaluation asks it which claims are labelled.
 - `agent_service.py`: the backend's only way to reach the agent's service. It gains `start_dispatch(agents)` and `start_evaluation(agents, eval_set, tiny)`, beside `resume_claim`.
 - `main.py`: the operations. It gains the run, cost and evaluation operations below and uses `scoring`.
 - `models.py`, `documents.py`, `payout.py` and `seed.py` keep their jobs.
@@ -263,17 +263,17 @@ Add `start_dispatch` to the backend and `agent_service.py`, `get_latest_dispatch
 
 Seed `held_out_claims` and `answer_key`. Add `create_evaluation` with its copies, `scoring.py`, `list_evaluations`, `get_evaluation`, `start_evaluation` in the backend, `agent_service.py` and the service, and the dispatcher's listing for an evaluation. Clear a held copy's progress. Refuse a sign-off on a copy, and leave the form off a copy's page.
 
-- [ ] `npm run seed` and `uv run -m backend.seed` still print 25 claims. Supabase MCP shows 25 rows in `held_out_claims` and 50 in `answer_key`, and `list_claims` still returns the 25 queue claims
-- [ ] pytest, backend: `create_evaluation` of the held-out set's tiny claims makes 5 waiting copies with ids like `E1-CLM-11..`, whose records carry the new ids. `list_claims` and the queue's counts are the same before and after
-- [ ] pytest, backend: `get_claim` on a copy has no field from the answer key, and its JSON doesn't contain the handler's reason for the original
-- [ ] pytest, backend: `sign_off_claim` on a copy waiting for sign-off returns 409 and changes nothing
-- [ ] pytest, `scoring.py`: on six claims worked out by hand, one of each kind of outcome (right, right approval with the wrong amount, wrong decline, wrong approval, needless referral and undecided), every measure matches the figure worked out by hand
-- [ ] Stub model test: an evaluation of three copies, one approved over the limit, leaves the queue as it was. The held copy counts as finished, its thread has nothing saved, and the evaluation's measures come from the backend
-- [ ] Stub model test: a dispatch running after an evaluation never lists its copies
-- [ ] Service test: `start_evaluation` returns 202 and creates the evaluation with its set, `tiny`, N, the model and its effort. A start while a dispatch runs returns 409
-- [ ] `grep -rn "answer_key\|evals" agent dashboard/src` finds nothing, and in the backend only `database.py` reads `data/evals/` and only `scoring.py` reads `answer_key`
-- [ ] vitest: a copy's page has no sign-off form and says it is an evaluation's copy
-- [ ] `npm run check` passes
+- [x] `npm run seed` and `uv run -m backend.seed` still print 25 claims. Supabase (queried directly, as its MCP server isn't connected here) shows 25 rows in `held_out_claims` and 50 in `answer_key`, and `list_claims` still returns the 25 queue claims
+- [x] pytest, backend: `create_evaluation` of the held-out set's tiny claims makes 5 waiting copies with ids like `E1-CLM-11..`, whose records carry the new ids. `list_claims` and the queue's counts are the same before and after
+- [x] pytest, backend: `get_claim` on a copy has no field from the answer key, and its JSON doesn't contain the handler's reason for the original
+- [x] pytest, backend: `sign_off_claim` on a copy waiting for sign-off returns 409 and changes nothing
+- [x] pytest, `scoring.py`: on six claims worked out by hand, one of each kind of outcome (right, right approval with the wrong amount, wrong decline, wrong approval, needless referral and undecided), every measure matches the figure worked out by hand
+- [x] Stub model test: an evaluation of three copies, one approved over the limit, leaves the queue as it was. The held copy counts as finished, its thread has nothing saved, and the evaluation's measures come from the backend
+- [x] Stub model test: a dispatch running after an evaluation never lists its copies
+- [x] Service test: `start_evaluation` returns 202 and creates the evaluation with its set, `tiny`, N, the model and its effort. A start while a dispatch runs returns 409
+- [x] `grep -rn "answer_key\|evals" agent dashboard/src` finds nothing, and in the backend only `database.py` reads `data/evals/` and only `scoring.py` reads `answer_key`
+- [x] vitest: a copy's page has no sign-off form and says it is an evaluation's copy
+- [x] `npm run check` passes
 
 ## Phase 5: The scoreboard
 

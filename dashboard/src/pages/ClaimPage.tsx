@@ -26,6 +26,13 @@ export function ClaimPage() {
         <p className="mono muted">{claim.claim_id}</p>
         <h1>{claim.summary}</h1>
         <StatusChip status={claim.status} />
+        {claim.copy_of && (
+          <p className="muted small">
+            An evaluation's copy of{" "}
+            <span className="mono">{claim.copy_of}</span>, worked apart from the
+            queue.
+          </p>
+        )}
       </div>
       <div className="claim-layout">
         <div className="column">

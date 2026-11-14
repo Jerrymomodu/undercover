@@ -316,3 +316,16 @@ it("shows why a sign-off was refused", async () => {
     "Claim CLM-1002 is not waiting for sign-off",
   );
 });
+
+it("has no sign-off form on an evaluation's copy", async () => {
+  showClaim({ ...held, evaluation_id: "run-7", copy_of: "CLM-1002" });
+  const panel = await decisionPanel();
+  expect(
+    panel.getByText(/Nobody signs off an evaluation's copy/),
+  ).toBeDefined();
+  expect(panel.queryByRole("button", { name: "Sign off" })).toBeNull();
+  expect(panel.queryByRole("combobox")).toBeNull();
+  expect(screen.getByText(/An evaluation's copy of/).textContent).toBe(
+    "An evaluation's copy of CLM-1002, worked apart from the queue.",
+  );
+});

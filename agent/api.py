@@ -200,6 +200,19 @@ def create_dispatch(agents: int, model: str, reasoning_effort: str) -> dict[str,
     return _call("POST", "/dispatches", json=body)
 
 
+def create_evaluation(
+    agents: int, eval_set: str, tiny: bool, model: str, reasoning_effort: str
+) -> dict[str, Any]:
+    body = {
+        "agents": agents,
+        "eval_set": eval_set,
+        "tiny": tiny,
+        "model": model,
+        "reasoning_effort": reasoning_effort,
+    }
+    return _call("POST", "/evaluations", json=body)
+
+
 def add_run_claims(run_id: str, claim_ids: list[str]) -> dict[str, Any]:
     return _call("PUT", f"/runs/{run_id}/claims", json={"claim_ids": claim_ids})
 

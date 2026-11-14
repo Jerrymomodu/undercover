@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -20,7 +20,7 @@ from sqlalchemy import (
     update,
 )
 
-from backend import agent_service
+from backend import agent_service, scoring
 from backend.database import (
     claim_view,
     claims,
@@ -28,6 +28,7 @@ from backend.database import (
     decisions,
     engine,
     handlers,
+    held_out_claims,
     is_seeded,
     model_calls,
     payments,
@@ -41,7 +42,10 @@ from backend.database import (
 )
 from backend.documents import contents, search, sections, titles
 from backend.models import (
+    ACCEPTED,
     DISPATCH,
+    EVALUATION,
+    EVALUATION_SET,
     FINISHED,
     RUNNING,
     STOPPED,
@@ -52,6 +56,9 @@ from backend.models import (
     DecisionRequest,
     DispatchRequest,
     DocumentName,
+    Evaluation,
+    EvaluationDetail,
+    EvaluationRequest,
     FailureRequest,
     Handler,
     HeldPayout,
@@ -73,6 +80,7 @@ from backend.models import (
     SectionMatch,
     SignOffRequest,
     StartDispatchRequest,
+    StartEvaluationRequest,
     StartRequest,
     Status,
     Step,
@@ -186,6 +194,8 @@ def to_claim(row: RowMapping) -> Claim:
             "customer_name": row["customer_name"],
             "thread_id": row["thread_id"],
             "attempts": row["attempts"],
+            "evaluation_id": row["evaluation_id"],
+            "copy_of": row["copy_of"],
             "decision": decision,
             "payment": payment,
         }
@@ -287,8 +297,9 @@ def health() -> dict[str, str]:
 
 @app.get("/api/claims", operation_id="list_claims")
 def list_claims(db: Database) -> list[ClaimSummary]:
-    """List every claim in the queue, in id order."""
-    rows = db.execute(claim_view.order_by(claims.c.claim_id)).mappings()
+    """List every claim in the queue, in id order, leaving out evaluations' copies."""
+    query = claim_view.where(claims.c.evaluation_id.is_(None))
+    rows = db.execute(query.order_by(claims.c.claim_id)).mappings()
     return [to_summary(row) for row in rows]
 
 
@@ -486,6 +497,8 @@ def sign_off_claim(
 ) -> Claim:
     """Sign off a held payout as a handler, so the agent picks the claim up and pays."""
     claim = find_claim(db, claim_id)
+    if claim["evaluation_id"] is not None:
+        raise HTTPException(409, f"Claim {claim_id} is an evaluation's copy")
     if claim["status"] != "waiting_for_sign_off":
         raise HTTPException(409, f"Claim {claim_id} is not waiting for sign-off")
     query = select(handlers).where(handlers.c.handler_id == request.handler_id)
@@ -526,7 +539,7 @@ def fail_claim(claim_id: str, request: FailureRequest, db: Database) -> Claim:
 def start_dispatch(request: StartDispatchRequest) -> dict[str, str]:
     """Ask the agent's service to start a dispatch with up to N claim agents at once."""
     agent_service.start_dispatch(request.agents)
-    return {"status": "accepted"}
+    return ACCEPTED
 
 
 @app.get("/api/dispatches/latest", operation_id="get_latest_dispatch")
@@ -540,6 +553,108 @@ def get_latest_dispatch(db: Database) -> Run | None:
     )
     run_id = db.execute(query).scalar_one_or_none()
     return None if run_id is None else find_run(db, run_id)
+
+
+@app.post("/api/evaluations/start", operation_id="start_evaluation", status_code=202)
+def start_evaluation(request: StartEvaluationRequest) -> dict[str, str]:
+    """Ask the agent's service to start an evaluation on copies of a labelled set."""
+    agent_service.start_evaluation(request.agents, request.eval_set, request.tiny)
+    return ACCEPTED
+
+
+@app.get("/api/evaluations", operation_id="list_evaluations")
+def list_evaluations(db: Database) -> list[Evaluation]:
+    """List the evaluations, newest first, with their measures."""
+    query = (
+        select(runs.c.run_id)
+        .where(runs.c.kind == EVALUATION)
+        .order_by(runs.c.number.desc())
+    )
+    found = [find_run(db, run_id) for run_id in db.execute(query).scalars()]
+    return [
+        Evaluation(
+            run=run, measures=scoring.measures(run, scoring.scored_claims(db, run))
+        )
+        for run in found
+    ]
+
+
+@app.get("/api/evaluations/{run_id}", operation_id="get_evaluation")
+def get_evaluation(run_id: str, db: Database) -> EvaluationDetail:
+    """Get one evaluation's measures, and its claims beside the handlers' decisions."""
+    run = find_run(db, run_id)
+    if run.kind != EVALUATION:
+        raise HTTPException(404, f"Evaluation {run_id} not found")
+    scored = scoring.scored_claims(db, run)
+    return EvaluationDetail(
+        run=run, measures=scoring.measures(run, scored), claims=scored
+    )
+
+
+def originals(db: Connection, request: EvaluationRequest) -> list[dict[str, Any]]:
+    """The records of the labelled claims to copy, whole set or just the tiny ones:
+    the queue's own claims for the evaluation set, or the held-out claims."""
+    table = claims if request.eval_set == EVALUATION_SET else held_out_claims
+    labelled = scoring.labelled_claims(db, request.eval_set, request.tiny)
+    query = (
+        select(table.c.record)
+        .where(table.c.claim_id.in_(labelled))
+        .order_by(table.c.claim_id)
+    )
+    return list(db.execute(query).scalars())
+
+
+def copy_claims(
+    db: Connection, run_id: str, number: int, records: list[dict[str, Any]]
+) -> None:
+    """Copy the claims for an evaluation, out of the queue, each with a new id written
+    into its record too, and link them to the evaluation."""
+    copies = [
+        (record | {"claim_id": f"E{number}-{record['claim_id']}"}, record["claim_id"])
+        for record in records
+    ]
+    db.execute(
+        insert(claims),
+        [
+            {
+                "claim_id": copy["claim_id"],
+                "customer_id": copy["customer_id"],
+                "record": copy,
+                "status": "waiting",
+                "thread_id": None,
+                "attempts": 0,
+                "evaluation_id": run_id,
+                "copy_of": original,
+            }
+            for copy, original in copies
+        ],
+    )
+    db.execute(
+        insert(run_claims),
+        [
+            {"run_id": run_id, "position": position, "claim_id": copy["claim_id"]}
+            for position, (copy, _) in enumerate(copies)
+        ],
+    )
+
+
+@app.post("/api/evaluations", operation_id="create_evaluation")
+def create_evaluation(request: EvaluationRequest, db: Database) -> Run:
+    """Record a new evaluation and make its copies of the labelled claims."""
+    run_id = str(uuid.uuid4())
+    number = db.execute(
+        insert(runs)
+        .values(
+            run_id=run_id,
+            kind=EVALUATION,
+            status=RUNNING,
+            started_at=now(),
+            **request.model_dump(),
+        )
+        .returning(runs.c.number)
+    ).scalar_one()
+    copy_claims(db, run_id, number, originals(db, request))
+    return find_run(db, run_id)
 
 
 @app.post("/api/dispatches", operation_id="create_dispatch")
@@ -561,9 +676,11 @@ def create_dispatch(request: DispatchRequest, db: Database) -> Run:
 @app.put("/api/runs/{run_id}/claims", operation_id="add_run_claims")
 def add_run_claims(run_id: str, request: RunClaimsRequest, db: Database) -> Run:
     """Record the claims a running dispatch works, in the order it listed them."""
-    running_run(db, run_id)
+    if running_run(db, run_id).kind != DISPATCH:
+        raise HTTPException(409, f"Run {run_id} is not a dispatch")
     for claim_id in request.claim_ids:
-        find_claim(db, claim_id)
+        if find_claim(db, claim_id)["evaluation_id"] is not None:
+            raise HTTPException(409, f"Claim {claim_id} is an evaluation's copy")
     db.execute(delete(run_claims).where(run_claims.c.run_id == run_id))
     if request.claim_ids:
         db.execute(

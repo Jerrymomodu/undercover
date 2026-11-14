@@ -1,5 +1,5 @@
-"""The agent's service, as the backend calls it: to start a dispatch, and once after
-each sign-off."""
+"""The agent's service, as the backend calls it: to start a dispatch or an evaluation,
+and once after each sign-off."""
 
 import logging
 import os
@@ -36,6 +36,11 @@ def _start(path: str, body: dict[str, Any]) -> None:
 def start_dispatch(agents: int) -> None:
     """Ask the agent to start a dispatch with up to agents claim agents at once."""
     _start("/dispatches", {"agents": agents})
+
+
+def start_evaluation(agents: int, eval_set: str, tiny: bool) -> None:
+    """Ask the agent to start an evaluation on copies of a labelled set."""
+    _start("/evaluations", {"agents": agents, "eval_set": eval_set, "tiny": tiny})
 
 
 def resume_claim(claim_id: str) -> None:

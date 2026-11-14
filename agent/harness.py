@@ -402,7 +402,8 @@ def carry_on(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
 def work_on(claim_id: str, run: Run, agent: ClaimAgent) -> str:
     """Carry a claim in progress on, or start a waiting one, for a dispatch or an
     evaluation, on a claim graph of its own. Return where the claim stands after; one
-    that has moved on since it was listed is left as it is."""
+    that has moved on since it was listed is left as it is. Nobody signs off an
+    evaluation's copy, so a held approval counts as finished and its progress goes."""
     status = api.get_claim(claim_id)["status"]
     if status == api.Status.IN_PROGRESS:
         carry_on(claim_id, agent.graph(), run.run_id)
@@ -410,4 +411,7 @@ def work_on(claim_id: str, run: Run, agent: ClaimAgent) -> str:
         work_claim(claim_id, agent.graph(), run.run_id)
     else:
         return status
-    return api.get_claim(claim_id)["status"]
+    claim = api.get_claim(claim_id)
+    if run.evaluation and claim["status"] == api.Status.WAITING_FOR_SIGN_OFF:
+        agent.saver().delete_thread(claim["thread_id"])
+    return claim["status"]

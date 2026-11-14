@@ -50,9 +50,13 @@ class DispatchContext:
 
 
 def list_claims(state: Dispatch, runtime: Runtime[DispatchContext]) -> dict[str, Any]:
-    """List every claim in progress and every waiting claim, oldest submitted first,
-    and record them on the run."""
+    """List the claims to work: an evaluation's copies, which the backend made for
+    it, or for a dispatch every claim in progress and every waiting claim, oldest
+    submitted first, recorded on the run."""
     context = runtime.context
+    if context.run.evaluation:
+        copies = api.get_run(context.run.run_id)["claims"]
+        return {"claims": [copy["claim_id"] for copy in copies]}
     queue = sorted(api.list_claims(), key=lambda claim: claim["submitted_on"])
     claims = [
         c["claim_id"]

@@ -30,8 +30,13 @@ from sqlalchemy.engine import URL, make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.schema import CreateSchema
 
+from backend.models import EVALUATION_SET, HELD_OUT
+
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
+# The labelled sets: the handlers' decisions, kept out of every claim operation,
+# and the held-out claims, kept out of the queue.
+EVALS = DATA / "evals"
 DOCUMENTS = {"policy_wording": "Policy wording", "claims_manual": "Claims manual"}
 SCHEMA = "undercover"
 CONNECTIONS = 4
@@ -84,6 +89,23 @@ claims = Table(
     Column("status", Text, nullable=False),
     Column("thread_id", Text),
     Column("attempts", Integer, nullable=False),
+    Column("evaluation_id", Text, ForeignKey("runs.run_id")),
+    Column("copy_of", Text),
+)
+held_out_claims = Table(
+    "held_out_claims",
+    metadata,
+    Column("claim_id", Text, primary_key=True),
+    Column("record", JSON, nullable=False),
+)
+answer_key = Table(
+    "answer_key",
+    metadata,
+    Column("eval_set", Text, primary_key=True),
+    Column("claim_id", Text, primary_key=True),
+    Column("decision", Text, nullable=False),
+    Column("payout", Float, nullable=False),
+    Column("tiny", Boolean, nullable=False),
 )
 decisions = Table(
     "decisions",
@@ -168,6 +190,8 @@ claim_view = (
         claims.c.status,
         claims.c.thread_id,
         claims.c.attempts,
+        claims.c.evaluation_id,
+        claims.c.copy_of,
         customers.c.name.label("customer_name"),
         decisions.c.decision,
         decisions.c.payout,
@@ -232,9 +256,23 @@ def is_seeded(db: Engine) -> bool:
     return inspect(db).has_table("claims")
 
 
-def load(name: str) -> Any:
-    """Read one of the JSON files in data/."""
-    return json.loads((DATA / name).read_text(encoding="utf-8"))
+def load(name: str, folder: Path = DATA) -> Any:
+    """Read one of the JSON files in data/, or in another folder."""
+    return json.loads((folder / name).read_text(encoding="utf-8"))
+
+
+def answers(eval_set: str, name: str) -> list[dict[str, Any]]:
+    """The handlers' decisions on one labelled set, as rows of the answer key."""
+    return [
+        {
+            "eval_set": eval_set,
+            "claim_id": d["claim_id"],
+            "decision": d["decision"],
+            "payout": d["payout"],
+            "tiny": d["tiny"],
+        }
+        for d in load(name, EVALS)
+    ]
 
 
 def seed(db: Engine) -> dict[str, int]:
@@ -303,9 +341,23 @@ def seed(db: Engine) -> dict[str, int]:
                     "status": "waiting",
                     "thread_id": None,
                     "attempts": 0,
+                    "evaluation_id": None,
+                    "copy_of": None,
                 }
                 for c in claim_rows
             ],
+        )
+        connection.execute(
+            insert(held_out_claims),
+            [
+                {"claim_id": c["claim_id"], "record": c}
+                for c in load("held_out_claims.json", EVALS)
+            ],
+        )
+        connection.execute(
+            insert(answer_key),
+            answers(EVALUATION_SET, "decisions.json")
+            + answers(HELD_OUT, "held_out_decisions.json"),
         )
     return {
         "claims": len(claim_rows),

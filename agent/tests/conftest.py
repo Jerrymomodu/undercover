@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.callbacks import BaseCallbackHandler
 
-from agent import api, harness
+from agent import api, harness, service
 from backend.main import app
 
 
@@ -32,3 +32,15 @@ def traces(monkeypatch):
     roots: list[dict[str, Any]] = []
     monkeypatch.setattr(harness, "CallbackHandler", lambda: RecordRoots(roots))
     return roots
+
+
+@pytest.fixture
+def serve():
+    """Run the agent's service, without its lifespan, on a given claim agent."""
+
+    def with_agent(agent):
+        service.app.dependency_overrides[service.build_agent] = lambda: agent
+        return TestClient(service.app)
+
+    yield with_agent
+    service.app.dependency_overrides.clear()

@@ -68,6 +68,8 @@ export interface Claim {
   status: Status;
   thread_id: string | null;
   attempts: number;
+  evaluation_id: string | null;
+  copy_of: string | null;
   decision: Decision | null;
   payment: Payment | null;
 }

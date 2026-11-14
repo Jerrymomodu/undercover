@@ -11,11 +11,15 @@ DecisionKind = Literal["approve", "decline", "refer"]
 StepKind = Literal["tool_call", "tool_result", "message", "reading", "error"]
 RunKind = Literal["dispatch", "evaluation"]
 RunStatus = Literal["running", "finished", "stopped"]
+EvalSet = Literal["evaluation", "held_out"]
 DISPATCH: RunKind = "dispatch"
+EVALUATION: RunKind = "evaluation"
+EVALUATION_SET: EvalSet = "evaluation"
+HELD_OUT: EvalSet = "held_out"
+ACCEPTED = {"status": "accepted"}
 RUNNING: RunStatus = "running"
 FINISHED: RunStatus = "finished"
 STOPPED: RunStatus = "stopped"
-EvalSet = Literal["evaluation", "held_out"]
 DocumentName = Literal["policy_wording", "claims_manual"]
 Benefit = Literal[
     "trip_cancellation",
@@ -89,6 +93,8 @@ class Claim(BaseModel):
     status: Status
     thread_id: str | None
     attempts: int
+    evaluation_id: str | None
+    copy_of: str | None
     decision: Decision | None
     payment: Payment | None
 
@@ -302,6 +308,17 @@ class StartDispatchRequest(BaseModel):
     agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
 
 
+class StartEvaluationRequest(BaseModel):
+    agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
+    eval_set: EvalSet = Field(description="The labelled set to work copies of")
+    tiny: bool = Field(description="Just the set's five tiny claims")
+
+
+class EvaluationRequest(StartEvaluationRequest):
+    model: str = Field(min_length=1, description="The model the agent runs on")
+    reasoning_effort: str = Field(min_length=1, description="Its effort, or none")
+
+
 class RunClaimsRequest(BaseModel):
     claim_ids: list[str] = Field(description="The claims to work, in order")
 
@@ -344,3 +361,37 @@ class Run(BaseModel):
     summary: RunSummary
     cost: float = Field(description="What the run's model calls cost, in US dollars")
     agent_seconds: float = Field(description="The agent's time on the run's claims")
+
+
+class Measures(BaseModel):
+    decision_accuracy: float
+    accuracy: float
+    cost_of_mistakes: float
+    straight_through: float
+    cost_per_claim: float
+    seconds_per_claim: float
+    run_seconds: float | None
+
+
+class ScoredClaim(BaseModel):
+    claim_id: str
+    copy_of: str
+    handler_decision: DecisionKind
+    handler_payout: float
+    decision: DecisionKind | None
+    payout: float | None
+    reason: str | None
+    agent_decision: DecisionKind = Field(description="An undecided claim is a referral")
+    right: bool
+    mistake_cost: float
+    cost: float
+    seconds: float
+
+
+class Evaluation(BaseModel):
+    run: Run
+    measures: Measures
+
+
+class EvaluationDetail(Evaluation):
+    claims: list[ScoredClaim]

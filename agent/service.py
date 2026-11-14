@@ -1,11 +1,11 @@
-"""The agent's service: the backend calls it to start a dispatch, and after a handler's
-sign-off to pick the claim back up. npm run dev starts it beside the backend and the
-dashboard."""
+"""The agent's service: the backend calls it to start a dispatch or an evaluation, and
+after a handler's sign-off to pick the claim back up. npm run dev starts it beside the
+backend and the dashboard."""
 
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Any, Literal
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -26,7 +26,9 @@ from agent.harness import (
 )
 
 MOST_AGENTS = 25
+EVALUATION = "evaluation"
 BUSY = "A dispatch or evaluation is already running"
+ACCEPTED = {"status": "accepted"}
 BACKEND_WAIT_SECONDS = 30
 
 # One dispatch or evaluation at a time, held from its start until it finishes.
@@ -59,6 +61,11 @@ class DispatchRequest(BaseModel):
     agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
 
 
+class EvaluationRequest(DispatchRequest):
+    eval_set: Literal["evaluation", "held_out"] = Field(description="The labelled set")
+    tiny: bool = Field(description="Just the set's five tiny claims")
+
+
 @app.exception_handler(api.Refused)
 def refused(_: Request, error: api.Refused) -> JSONResponse:
     """Pass on the backend's refusal, such as a claim it doesn't know."""
@@ -73,18 +80,33 @@ def build_agent(request: Request) -> ClaimAgent:
 Agent = Annotated[ClaimAgent, Depends(build_agent)]
 
 
-def run_dispatch(agents: int, agent: ClaimAgent) -> None:
-    """Create a dispatch on the backend and work it, then let another run start."""
+Create = Callable[[str, str], dict[str, Any]]
+
+
+def run(create: Create, agents: int, agent: ClaimAgent) -> None:
+    """Create a dispatch or an evaluation on the backend, recording the model and its
+    effort, and work it, then let another run start."""
     try:
         name, effort = chosen_model()
-        run = api.create_dispatch(agents, name, effort or NO_EFFORT)
+        created = create(name, effort or NO_EFFORT)
+        evaluation = created["kind"] == EVALUATION
         try:
-            dispatch(Run(run["run_id"], evaluation=False), agent, agents, resuming)
+            dispatch(Run(created["run_id"], evaluation), agent, agents, resuming)
         except Exception:
             api.stop_runs()  # this run is the only one running
             raise
     finally:
         running.release()
+
+
+def start(
+    background: BackgroundTasks, create: Create, agents: int, agent: ClaimAgent
+) -> dict[str, str]:
+    """Start a run in the background, or refuse while another is going."""
+    if not running.acquire(blocking=False):
+        raise HTTPException(409, BUSY)
+    background.add_task(run, create, agents, agent)
+    return ACCEPTED
 
 
 def resume(claim_id: str, agent: ClaimAgent) -> None:
@@ -106,10 +128,25 @@ def start_dispatch(
     request: DispatchRequest, agent: Agent, background: BackgroundTasks
 ) -> dict[str, str]:
     """Start a dispatch with up to N claim agents at once, without waiting for it."""
-    if not running.acquire(blocking=False):
-        raise HTTPException(409, BUSY)
-    background.add_task(run_dispatch, request.agents, agent)
-    return {"status": "accepted"}
+
+    def create(name: str, effort: str) -> dict[str, Any]:
+        return api.create_dispatch(request.agents, name, effort)
+
+    return start(background, create, request.agents, agent)
+
+
+@app.post("/api/evaluations", operation_id="start_evaluation", status_code=202)
+def start_evaluation(
+    request: EvaluationRequest, agent: Agent, background: BackgroundTasks
+) -> dict[str, str]:
+    """Start an evaluation on copies of a labelled set, without waiting for it."""
+
+    def create(name: str, effort: str) -> dict[str, Any]:
+        return api.create_evaluation(
+            request.agents, request.eval_set, request.tiny, name, effort
+        )
+
+    return start(background, create, request.agents, agent)
 
 
 @app.post("/api/claims/{claim_id}/resume", operation_id="resume_claim", status_code=202)
@@ -123,4 +160,4 @@ def resume_claim(
         raise HTTPException(409, f"Claim {claim_id} has no sign-off waiting to be paid")
     resuming.add(claim_id)
     background.add_task(resume, claim_id, agent)
-    return {"status": "accepted"}
+    return ACCEPTED

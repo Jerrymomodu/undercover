@@ -10,18 +10,6 @@ from agent.tests.stubs import agent_on, decide, graph_on, stub
 from api_rules import rule_breaks
 
 
-@pytest.fixture
-def serve():
-    """Run the agent's service, without its lifespan, on a given claim agent."""
-
-    def with_agent(agent):
-        service.app.dependency_overrides[service.build_agent] = lambda: agent
-        return TestClient(service.app)
-
-    yield with_agent
-    service.app.dependency_overrides.clear()
-
-
 def resume(agent, claim_id):
     return agent.post(f"/api/claims/{claim_id}/resume")
 

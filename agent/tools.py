@@ -39,10 +39,16 @@ class ClaimState(TypedDict):
     status: Annotated[str, keep_last]
 
 
+# Whether a claim is an evaluation's copy is the backend's business, not the agent's,
+# which works a copy as it would any claim.
+EVALUATION_FIELDS = ("evaluation_id", "copy_of")
+
+
 @tool
 def get_claim(runtime: ToolRuntime[ClaimContext]) -> str:
     """Get your claim in full: the story, the items claimed and the documents."""
-    return json.dumps(api.get_claim(runtime.context.claim_id))
+    claim = api.get_claim(runtime.context.claim_id)
+    return json.dumps({k: v for k, v in claim.items() if k not in EVALUATION_FIELDS})
 
 
 @tool
