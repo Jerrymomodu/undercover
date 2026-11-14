@@ -248,16 +248,16 @@ Reshape `runs`, add `run_claims`, and add `create_dispatch`, `add_run_claims`, `
 
 Add `start_dispatch` to the backend and `agent_service.py`, `get_latest_dispatch` with the summary, cost and time, and the dispatch panel. Update the stand-in and the end-to-end tests.
 
-- [ ] pytest, backend: `start_dispatch` sends N to the agent's service (a recorder in its place) and returns 202. A 409 from the service returns 409 with its message. A service that can't be reached returns 503 "The agent's service isn't running"
-- [ ] pytest, backend: the summary of a finished dispatch, built from records: 2 approved (one paid, one waiting for sign-off at $1,350.00), 1 declined, 1 referred, 1 left for a handler and 1 still in progress, with the claim ids and the amount
-- [ ] pytest, backend: the dispatch's cost and time are the sums of its own model calls and work times, failed attempts included, and leave out rows with no run or another run
-- [ ] `grep -rn "UNDERCOVER_AGENT\|8002" backend --include=*.py` finds them only in `backend/agent_service.py`
-- [ ] vitest: the dispatch panel's number starts at 3 and accepts 1 to 25, the start sends N, a refusal shows its message, a running dispatch shows its claims, and a finished one shows its summary, cost and time
-- [ ] e2e: on the queue page, setting N to 5 and pressing "Start dispatch" reaches the stand-in with `{"agents": 5}`
-- [ ] e2e: a dispatch played through the API shows its claims as each one moves, then its summary when it finishes, without a reload
-- [ ] Browser, with `npm run dev` running and the agent's service stopped: "Start dispatch" says the agent's service isn't running
-- [ ] Browser: screenshots of the dispatch panel, running and finished (filled through the API), in light and dark mode, show rounded panels with no outlines, no one-edge borders and no gradients. `browser_console_messages` shows no errors
-- [ ] `npm run check` passes
+- [x] pytest, backend: `start_dispatch` sends N to the agent's service (a recorder in its place) and returns 202. A 409 from the service returns 409 with its message. A service that can't be reached returns 503 "The agent's service isn't running"
+- [x] pytest, backend: the summary of a finished dispatch, built from records: 2 approved (one paid, one waiting for sign-off at $1,350.00), 1 declined, 1 referred, 1 left for a handler and 1 still in progress, with the claim ids and the amount
+- [x] pytest, backend: the dispatch's cost and time are the sums of its own model calls and work times, failed attempts included, and leave out rows with no run or another run
+- [x] `grep -rn "UNDERCOVER_AGENT\|8002" backend --include=*.py` finds them only in `backend/agent_service.py`
+- [x] vitest: the dispatch panel's number starts at 3 and accepts 1 to 25, the start sends N, a refusal shows its message, a running dispatch shows its claims, and a finished one shows its summary, cost and time
+- [x] e2e: on the queue page, setting N to 5 and pressing "Start dispatch" reaches the stand-in with `{"agents": 5}`
+- [x] e2e: a dispatch played through the API shows its claims as each one moves, then its summary when it finishes, without a reload
+- [x] Browser, with `npm run dev` running and the agent's service stopped: "Start dispatch" says the agent's service isn't running
+- [x] Browser: screenshots of the dispatch panel, running and finished (filled through the API), in light and dark mode, show rounded panels with no outlines, no one-edge borders and no gradients. `browser_console_messages` shows no errors
+- [x] `npm run check` passes
 
 ## Phase 4: Evaluations
 

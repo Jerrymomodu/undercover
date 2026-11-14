@@ -118,6 +118,50 @@ export interface Instructions {
   claim: string;
 }
 
+export type RunStatus = "running" | "finished" | "stopped";
+export type RunKind = "dispatch" | "evaluation";
+export type EvalSet = "evaluation" | "held_out";
+
+export interface RunClaim {
+  claim_id: string;
+  status: Status;
+  decision: DecisionKind | null;
+  payout: number | null;
+}
+
+export interface HeldPayout {
+  claim_id: string;
+  payout: number;
+}
+
+export interface RunSummary {
+  approved: number;
+  declined: number;
+  referred: number;
+  waiting_for_sign_off: HeldPayout[];
+  left_for_handler: string[];
+  in_progress: string[];
+  waiting: string[];
+}
+
+export interface Run {
+  run_id: string;
+  number: number;
+  kind: RunKind;
+  agents: number;
+  status: RunStatus;
+  started_at: string;
+  finished_at: string | null;
+  eval_set: EvalSet | null;
+  tiny: boolean | null;
+  model: string;
+  reasoning_effort: string;
+  claims: RunClaim[];
+  summary: RunSummary;
+  cost: number;
+  agent_seconds: number;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -162,6 +206,9 @@ export const api = {
     ),
   getInstructions: () => request<Instructions>("/api/instructions"),
   listHandlers: () => request<Handler[]>("/api/handlers"),
+  getLatestDispatch: () => request<Run | null>("/api/dispatches/latest"),
+  startDispatch: (agents: number) =>
+    post<{ status: string }>("/api/dispatch/start", { agents }),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),
 };

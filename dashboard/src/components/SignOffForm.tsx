@@ -1,6 +1,7 @@
-import { type SyntheticEvent, useState } from "react";
+import { useState } from "react";
 import { api } from "../api";
 import { useLoad } from "../useLoad";
+import { useSubmit } from "../useSubmit";
 
 export function SignOffForm({
   claimId,
@@ -8,17 +9,11 @@ export function SignOffForm({
 }: Readonly<{ claimId: string; onSignedOff: () => void }>) {
   const { data: handlers } = useLoad(api.listHandlers);
   const [handlerId, setHandlerId] = useState("");
-  const [error, setError] = useState<string>();
-  const [sending, setSending] = useState(false);
-
-  function submit(event: SyntheticEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSending(true);
-    api.signOff(claimId, handlerId).then(onSignedOff, (reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : "Sign-off failed");
-      setSending(false);
-    });
-  }
+  const { submit, sending, error } = useSubmit(
+    () => api.signOff(claimId, handlerId),
+    onSignedOff,
+    "Sign-off failed",
+  );
 
   return (
     <form className="sign-off-form" onSubmit={submit}>

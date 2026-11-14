@@ -298,6 +298,10 @@ class DispatchRequest(BaseModel):
     reasoning_effort: str = Field(min_length=1, description="Its effort, or none")
 
 
+class StartDispatchRequest(BaseModel):
+    agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
+
+
 class RunClaimsRequest(BaseModel):
     claim_ids: list[str] = Field(description="The claims to work, in order")
 
@@ -307,6 +311,21 @@ class RunClaim(BaseModel):
     status: Status
     decision: DecisionKind | None
     payout: float | None
+
+
+class HeldPayout(BaseModel):
+    claim_id: str
+    payout: float
+
+
+class RunSummary(BaseModel):
+    approved: int
+    declined: int
+    referred: int
+    waiting_for_sign_off: list[HeldPayout]
+    left_for_handler: list[str]
+    in_progress: list[str]
+    waiting: list[str]
 
 
 class Run(BaseModel):
@@ -322,3 +341,6 @@ class Run(BaseModel):
     model: str
     reasoning_effort: str
     claims: list[RunClaim]
+    summary: RunSummary
+    cost: float = Field(description="What the run's model calls cost, in US dollars")
+    agent_seconds: float = Field(description="The agent's time on the run's claims")

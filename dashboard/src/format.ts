@@ -1,8 +1,15 @@
-import type { DecisionKind, Status } from "./api";
+import type { DecisionKind, RunStatus, Status } from "./api";
 
 const dollars = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
+});
+
+// Model calls cost fractions of a cent, so their costs show four decimal places.
+const modelCosts = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 4,
 });
 
 const day = new Intl.DateTimeFormat("en-US", {
@@ -20,6 +27,17 @@ const clock = new Intl.DateTimeFormat("en-US", {
 
 export function money(amount: number): string {
   return dollars.format(amount);
+}
+
+export function cost(amount: number): string {
+  return modelCosts.format(amount);
+}
+
+export function duration(seconds: number): string {
+  const whole = Math.round(seconds);
+  const minutes = Math.floor(whole / 60);
+  const rest = whole % 60;
+  return minutes ? `${String(minutes)}m ${String(rest)}s` : `${String(rest)}s`;
 }
 
 export function date(isoDate: string): string {
@@ -41,6 +59,12 @@ export const statusLabels: Record<Status, string> = {
   waiting_for_sign_off: "Waiting for sign-off",
   decided: "Decided",
   left_for_handler: "Left for a handler",
+};
+
+export const runLabels: Record<RunStatus, string> = {
+  running: "Running",
+  finished: "Finished",
+  stopped: "Stopped",
 };
 
 export const decisionLabels: Record<DecisionKind, string> = {

@@ -187,7 +187,8 @@ p {
 }
 
 .status-waiting_for_sign_off,
-.decision-decline {
+.decision-decline,
+.run-stopped {
   background: var(--coral);
 }
 
@@ -243,8 +244,30 @@ p {
   margin: 16px 0 8px;
 }
 
+.run-claims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.run-claim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: var(--inset);
+  border-radius: 10px;
+  padding: 7px 12px;
+}
+
+.run-claim .chip:first-child {
+  min-width: 150px;
+  text-align: center;
+}
+
 .summary {
-  white-space: pre-wrap;
   max-width: 90ch;
 }
 
@@ -410,7 +433,8 @@ p {
   padding: 14px 16px;
 }
 
-.sign-off-form {
+.sign-off-form,
+.start-form {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
@@ -418,7 +442,8 @@ p {
   margin-top: 12px;
 }
 
-.sign-off-form label {
+.sign-off-form label,
+.start-form label {
   display: grid;
   gap: 4px;
   font-size: 0.8rem;
@@ -426,7 +451,9 @@ p {
 }
 
 .sign-off-form select,
-.sign-off-form button {
+.sign-off-form button,
+.start-form input,
+.start-form button {
   font: inherit;
   font-size: 0.95rem;
   border-radius: 999px;
@@ -440,14 +467,23 @@ p {
   min-width: 200px;
 }
 
-.sign-off-form button {
+.start-form input {
+  background: var(--inset);
+  color: var(--ink);
+  font-family: var(--mono);
+  width: 7rem;
+}
+
+.sign-off-form button,
+.start-form button {
   background: var(--sea-green);
   color: var(--midnight);
   font-weight: 600;
   cursor: pointer;
 }
 
-.sign-off-form button:disabled {
+.sign-off-form button:disabled,
+.start-form button:disabled {
   opacity: 0.5;
   cursor: default;
 }

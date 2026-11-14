@@ -7,8 +7,18 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
-from sqlalchemy import Connection, RowMapping, delete, insert, select, update
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
+from sqlalchemy import (
+    Column,
+    Connection,
+    RowMapping,
+    delete,
+    func,
+    insert,
+    select,
+    update,
+)
 
 from backend import agent_service
 from backend.database import (
@@ -38,11 +48,13 @@ from backend.models import (
     Claim,
     ClaimSummary,
     Decision,
+    DecisionKind,
     DecisionRequest,
     DispatchRequest,
     DocumentName,
     FailureRequest,
     Handler,
+    HeldPayout,
     Instructions,
     ModelCall,
     ModelCallRequest,
@@ -56,9 +68,11 @@ from backend.models import (
     Run,
     RunClaim,
     RunClaimsRequest,
+    RunSummary,
     Section,
     SectionMatch,
     SignOffRequest,
+    StartDispatchRequest,
     StartRequest,
     Status,
     Step,
@@ -81,6 +95,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="UnderCover", lifespan=lifespan)
+
+
+@app.exception_handler(agent_service.Refused)
+def agent_refused(_: Request, error: agent_service.Refused) -> JSONResponse:
+    """Pass on why the agent's service didn't start a run."""
+    return JSONResponse({"detail": error.detail}, status_code=error.status_code)
 
 
 def database() -> Iterator[Connection]:
@@ -198,8 +218,40 @@ def find_run_row(db: Connection, run_id: str) -> RowMapping:
     return row
 
 
+def summarize(items: list[RunClaim]) -> RunSummary:
+    """Sum up how a run's claims stand, from the records alone."""
+
+    def with_status(status: Status) -> list[RunClaim]:
+        return [claim for claim in items if claim.status == status]
+
+    def decided(decision: DecisionKind) -> int:
+        return sum(claim.decision == decision for claim in items)
+
+    return RunSummary(
+        approved=decided("approve"),
+        declined=decided("decline"),
+        referred=decided("refer"),
+        waiting_for_sign_off=[
+            HeldPayout(claim_id=claim.claim_id, payout=claim.payout or 0)
+            for claim in with_status("waiting_for_sign_off")
+        ],
+        left_for_handler=[c.claim_id for c in with_status("left_for_handler")],
+        in_progress=[c.claim_id for c in with_status("in_progress")],
+        waiting=[c.claim_id for c in with_status("waiting")],
+    )
+
+
+def run_total(db: Connection, column: Column[float], run_id: str) -> float:
+    """Add up one column of a run's model calls or work times."""
+    query = select(func.coalesce(func.sum(column), 0.0)).where(
+        column.table.c.run_id == run_id
+    )
+    return db.execute(query).scalar_one()
+
+
 def find_run(db: Connection, run_id: str) -> Run:
-    """Return one run with its claims and where each stands, or raise a 404."""
+    """Return one run with its claims and where each stands, its summary, and what
+    its model calls cost and its claims took, or raise a 404."""
     row = find_run_row(db, run_id)
     query = (
         claim_view.join(run_claims, run_claims.c.claim_id == claims.c.claim_id)
@@ -210,7 +262,13 @@ def find_run(db: Connection, run_id: str) -> Run:
         RunClaim(**{field: claim[field] for field in RunClaim.model_fields})
         for claim in db.execute(query).mappings()
     ]
-    return Run(**row, claims=items)
+    return Run(
+        **row,
+        claims=items,
+        summary=summarize(items),
+        cost=run_total(db, model_calls.c.cost, run_id),
+        agent_seconds=run_total(db, work_times.c.seconds, run_id),
+    )
 
 
 def running_run(db: Connection, run_id: str) -> Run:
@@ -462,6 +520,26 @@ def fail_claim(claim_id: str, request: FailureRequest, db: Database) -> Claim:
     status = "left_for_handler" if claim["attempts"] >= ATTEMPTS else "waiting"
     set_status(db, claim_id, status)
     return to_claim(find_claim(db, claim_id))
+
+
+@app.post("/api/dispatch/start", operation_id="start_dispatch", status_code=202)
+def start_dispatch(request: StartDispatchRequest) -> dict[str, str]:
+    """Ask the agent's service to start a dispatch with up to N claim agents at once."""
+    agent_service.start_dispatch(request.agents)
+    return {"status": "accepted"}
+
+
+@app.get("/api/dispatches/latest", operation_id="get_latest_dispatch")
+def get_latest_dispatch(db: Database) -> Run | None:
+    """Get the newest dispatch with its claims, summary, cost and time, or nothing."""
+    query = (
+        select(runs.c.run_id)
+        .where(runs.c.kind == DISPATCH)
+        .order_by(runs.c.number.desc())
+        .limit(1)
+    )
+    run_id = db.execute(query).scalar_one_or_none()
+    return None if run_id is None else find_run(db, run_id)
 
 
 @app.post("/api/dispatches", operation_id="create_dispatch")

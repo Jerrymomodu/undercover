@@ -1,23 +1,7 @@
 import pytest
 
-from backend.tests.claim_requests import start
+from backend.tests.claim_requests import model_call, start, work_time
 from backend.tests.runs import create_dispatch
-
-
-def model_call(client, claim_id, run_id=None, **changes):
-    body = {
-        "run_id": run_id,
-        "model": "openai/gpt-6-luna",
-        "input_tokens": 1500,
-        "output_tokens": 90,
-        "cost": 0.0021,
-    } | changes
-    return client.post(f"/api/claims/{claim_id}/model-calls", json=body)
-
-
-def work_time(client, claim_id, run_id=None, seconds=12.5):
-    body = {"run_id": run_id, "seconds": seconds}
-    return client.post(f"/api/claims/{claim_id}/work-times", json=body)
 
 
 def test_a_model_call_is_recorded_with_no_run(client):

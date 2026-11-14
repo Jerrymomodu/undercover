@@ -1,5 +1,5 @@
-import type { DecisionKind, Status } from "../api";
-import { decisionLabels, statusLabels } from "../format";
+import type { DecisionKind, RunStatus, Status } from "../api";
+import { decisionLabels, runLabels, statusLabels } from "../format";
 
 export function StatusChip({ status }: Readonly<{ status: Status }>) {
   return (
@@ -15,4 +15,8 @@ export function DecisionChip({
       {decisionLabels[decision]}
     </span>
   );
+}
+
+export function RunChip({ status }: Readonly<{ status: RunStatus }>) {
+  return <span className={`chip run-${status}`}>{runLabels[status]}</span>;
 }
