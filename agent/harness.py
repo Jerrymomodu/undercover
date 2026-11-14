@@ -1,4 +1,4 @@
-"""The harness: a queue agent works the run, and a claim graph works each claim."""
+"""The harness: builds the claim agent, and works one claim on its own thread."""
 
 import contextvars
 import json
@@ -7,17 +7,13 @@ import os
 import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import partial
 from time import perf_counter
 from typing import Any, cast
 
-from langchain.agents import create_agent
-from langchain.agents.middleware import (
-    AgentMiddleware,
-    ModelCallLimitMiddleware,
-    ToolErrorMiddleware,
-)
 from langchain.tools import ToolException
+from langchain_core.exceptions import ModelRateLimitError, ModelTimeoutError
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
 from langchain_core.messages import (
     AIMessage,
@@ -31,7 +27,6 @@ from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_openai import ChatOpenAI
 from langfuse.langchain import CallbackHandler
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -45,73 +40,108 @@ from psycopg_pool import ConnectionPool
 from pydantic import SecretStr
 
 from agent import api
-from agent.tools import CLAIM_TOOLS, QUEUE_TOOLS, ClaimContext, ClaimState, RunContext
+from agent.tools import CLAIM_TOOLS, ClaimContext, ClaimState
 
 log = logging.getLogger(__name__)
 
 ClaimGraph = CompiledStateGraph[ClaimState, ClaimContext, Any, Any]
-QueueAgent = CompiledStateGraph[Any, RunContext, Any, Any]
+Pool = ConnectionPool[Connection[DictRow]]
 Messages = dict[str, list[BaseMessage]]
 Start = Messages | Command | None
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_MODEL = "openai/gpt-6-luna"
+DEFAULT_EFFORT = "low"
+NO_EFFORT = "none"
 SCHEMA = "undercover"
 CONNECTIONS = 4
+# Claim agents wait for one of the process's connections rather than fail.
+CONNECTION_WAIT_SECONDS = 600
 CLAIM_MODEL_CALLS = 30
-QUEUE_MODEL_CALLS_PER_CLAIM = 6
-QUEUE_MODEL_CALLS_TO_PLAN = 12
-REMINDERS = 2
 NO_DECISION = "The agent finished without recording a decision"
-NO_SUMMARY = "The run finished without a summary."
-RUN_STOPPED = "The run stopped before it finished."
 WORK_CLAIM = "Work claim"
 CARRY_ON = "Carry on"
 AGENT = "agent"
 TOOLS = "tools"
 PAUSE = "wait_for_sign_off"
 PAY = "pay"
+# The errors a dispatch waits out and carries the claim on from, as the same attempt.
+PASSING = (ModelRateLimitError, ModelTimeoutError)
 
 
 class TooManyModelCalls(Exception):
     """The claim agent made as many model calls as it may without finishing."""
 
 
+@dataclass(frozen=True)
+class ClaimAgent:
+    """The claim agent: its model, and a new saver for each claim run, because a
+    saver holds a lock around every read and write."""
+
+    llm: BaseChatModel
+    saver: Callable[[], BaseCheckpointSaver[Any]]
+
+    def graph(self) -> ClaimGraph:
+        """Build a claim graph on a saver of its own."""
+        return claim_graph(self.llm, self.saver())
+
+
+@dataclass(frozen=True)
+class Run:
+    """A dispatch or an evaluation that claim agents work claims in."""
+
+    run_id: str
+    evaluation: bool
+
+
+def chosen_model() -> tuple[str, str | None]:
+    """Return the model named in MODEL_NAME, with no reasoning effort set, or GPT-6
+    Luna with low reasoning effort by default."""
+    if name := os.getenv("MODEL_NAME"):
+        return name, None
+    return DEFAULT_MODEL, DEFAULT_EFFORT
+
+
 def model() -> ChatOpenAI:
-    """Return the model named in MODEL_NAME, or GPT-6 Luna by default."""
-    name = os.getenv("MODEL_NAME")
+    """Return the chosen model on OpenRouter."""
+    name, effort = chosen_model()
     return ChatOpenAI(
-        model=name or DEFAULT_MODEL,
+        model=name,
         base_url=OPENROUTER_BASE_URL,
         api_key=SecretStr(os.environ["OPENROUTER_API_KEY"]),
-        reasoning_effort=None if name else "low",
+        reasoning_effort=effort,
         timeout=120,
         max_retries=5,
     )
 
 
 @contextmanager
-def checkpointer() -> Iterator[PostgresSaver]:
-    """Save the claim graph's progress in Postgres at DATABASE_URL, in our own schema,
-    with at most CONNECTIONS connections."""
+def connections() -> Iterator[Pool]:
+    """Open the process's connections to Postgres at DATABASE_URL, at most
+    CONNECTIONS of them, where the claim graph saves its progress in our own schema."""
     settings = {
         "autocommit": True,
         "prepare_threshold": 0,
         "row_factory": dict_row,
         "options": f"-c search_path={SCHEMA}",
     }
-    with ConnectionPool[Connection[DictRow]](
+    with Pool(
         os.environ["DATABASE_URL"],
         min_size=1,
         max_size=CONNECTIONS,
         kwargs=settings,
+        timeout=CONNECTION_WAIT_SECONDS,
     ) as pool:
         with pool.connection() as connection:
             create = sql.SQL("CREATE SCHEMA IF NOT EXISTS {}")
             connection.execute(create.format(sql.Identifier(SCHEMA)))
-        saver = PostgresSaver(pool)
-        saver.setup()
-        yield saver
+        PostgresSaver(pool).setup()
+        yield pool
+
+
+def claim_agent(llm: BaseChatModel, pool: Pool) -> ClaimAgent:
+    """The claim agent on the model, saving each claim run's progress on the pool."""
+    return ClaimAgent(llm, partial(PostgresSaver, pool))
 
 
 def refusal(error: Exception) -> str:
@@ -242,12 +272,21 @@ def thread_of(claim: dict[str, Any]) -> RunnableConfig:
     return {"configurable": {"thread_id": claim["thread_id"]}}
 
 
-def claim_config(claim: dict[str, Any], name: str) -> RunnableConfig:
-    """Run on the claim's thread, traced in Langfuse in the session of that thread."""
+def claim_config(
+    claim: dict[str, Any], name: str, run_id: str | None
+) -> RunnableConfig:
+    """Run on the claim's thread, traced in Langfuse in the session of that thread
+    and tagged with its run, so a whole run can be found together."""
     session = f"{claim['claim_id']}:{claim['thread_id']}"
+    metadata: dict[str, Any] = {
+        "langfuse_session_id": session,
+        "langfuse_trace_name": name,
+    }
+    if run_id:
+        metadata["langfuse_tags"] = [run_id]
     return thread_of(claim) | {
         "callbacks": [CallbackHandler()],
-        "metadata": {"langfuse_session_id": session, "langfuse_trace_name": name},
+        "metadata": metadata,
         # One tool call at a time, so two decisions in one reply can't race.
         "max_concurrency": 1,
     }
@@ -263,7 +302,7 @@ def begin(claim_id: str) -> Messages:
     return ask(f"Claim {claim_id}")
 
 
-def describe(error: Exception) -> str:
+def describe(error: BaseException) -> str:
     """Say in one line what went wrong."""
     lines = str(error).splitlines()
     return f"{type(error).__name__}: {lines[0]}" if lines else type(error).__name__
@@ -292,18 +331,21 @@ def run_claim_graph(
     run_id: str | None,
 ) -> str | None:
     """Run the claim graph on the claim's thread, saving each step, and say what went
-    wrong, if anything."""
+    wrong, if anything. A rate limit or a timeout goes through to the dispatcher, with
+    the claim left in progress, so it can wait and carry the claim on."""
     try:
-        # A fresh context makes this a root run even inside the queue agent's tool,
-        # which Langfuse needs to put it in the claim's session.
+        # A fresh context makes this a root run even inside the dispatcher's worker,
+        # so it is never a subgraph, and Langfuse puts it in the claim's session.
         contextvars.Context().run(
             graph.invoke,
             start,
-            claim_config(claim, name),
+            claim_config(claim, name, run_id),
             context=ClaimContext(claim["claim_id"], run_id),
             durability="sync",
         )
-    except Exception as error:  # a claim that fails must not stop the run
+    except PASSING:
+        raise
+    except Exception as error:  # a claim that fails must not stop the dispatch
         return describe(error)
     return None
 
@@ -357,89 +399,15 @@ def carry_on(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
     return settle(claim_id, error)
 
 
-def waiting() -> list[str]:
-    """Return the ids of the claims waiting in the queue, oldest submitted first."""
-    claims = sorted(api.list_claims(), key=lambda claim: claim["submitted_on"])
-    return [c["claim_id"] for c in claims if c["status"] == api.Status.WAITING]
-
-
-def finish_stopped_run() -> None:
-    """Finish the latest run if it stopped before it finished."""
-    run = api.get_latest_run()
-    if run is not None and run["status"] == api.RunStatus.RUNNING:
-        api.finish_run(run["run_id"], RUN_STOPPED)
-
-
-def carry_on_stopped(graph: ClaimGraph) -> None:
-    """Carry on every claim in progress: stopped partway, or signed off while the
-    agent was away."""
-    for claim in api.list_claims():
-        if claim["status"] == api.Status.IN_PROGRESS:
-            carry_on(claim["claim_id"], graph, None)
-
-
-def missed(run: RunContext) -> list[str]:
-    """Return the waiting claims the run should still work: its own, then new ones."""
-    ids = waiting()
-    own = [claim_id for claim_id in ids if claim_id in run.started]
-    new = [claim_id for claim_id in ids if claim_id not in run.started]
-    return own + new[: run.cap - len(run.started)]
-
-
-def queue_agent(llm: BaseChatModel, cap: int) -> QueueAgent:
-    """Build the queue agent for a run, which keeps its conversation between turns."""
-    calls = QUEUE_MODEL_CALLS_PER_CLAIM * cap + QUEUE_MODEL_CALLS_TO_PLAN
-    middleware: list[AgentMiddleware[Any, Any]] = [
-        ModelCallLimitMiddleware(run_limit=calls, exit_behavior="error"),
-        ToolErrorMiddleware(lambda error, _: refusal(error)),
-    ]
-    return create_agent(
-        llm,
-        tools=QUEUE_TOOLS,
-        system_prompt=api.get_instructions()["queue"],
-        middleware=middleware,
-        context_schema=RunContext,
-        checkpointer=InMemorySaver(),
-    )
-
-
-def work_queue(run: RunContext, agent: QueueAgent) -> str:
-    """Let the queue agent work the run, naming any claims it missed, and summarize."""
-    # One tool call at a time, so the cap holds when several claims are handed over.
-    config: RunnableConfig = {
-        "configurable": {"thread_id": run.run_id},
-        "max_concurrency": 1,
-    }
-    message = f"Please work the queue. This run can work up to {run.cap} claims."
-    state = agent.invoke(ask(message), config, context=run)
-    for _ in range(REMINDERS):
-        left = missed(run)
-        if not left:
-            break
-        reminder = (
-            "These claims are still waiting within the run's cap: "
-            f"{', '.join(left)}. Please work them, then finish with the summary."
-        )
-        state = agent.invoke(ask(reminder), config, context=run)
-    return state["messages"][-1].text or NO_SUMMARY
-
-
-def run_queue(cap: int | None, llm: BaseChatModel, graph: ClaimGraph) -> None:
-    """Finish a run that stopped and carry on every claim in progress, then work the
-    queue with a queue agent, up to cap claims or every waiting claim."""
-    finish_stopped_run()
-    carry_on_stopped(graph)
-    count = len(waiting())
-    if count == 0:
-        log.info("No claims are waiting")
-        return
-    cap = min(cap or count, count)
-    run_id = api.start_run(cap)["run_id"]
-    run = RunContext(run_id, cap, partial(work_claim, graph=graph, run_id=None))
-    try:
-        summary = work_queue(run, queue_agent(llm, cap))
-    except Exception as error:
-        api.finish_run(run_id, f"The run stopped: {describe(error)}")
-        raise
-    api.finish_run(run_id, summary)
-    log.info(summary)
+def work_on(claim_id: str, run: Run, agent: ClaimAgent) -> str:
+    """Carry a claim in progress on, or start a waiting one, for a dispatch or an
+    evaluation, on a claim graph of its own. Return where the claim stands after; one
+    that has moved on since it was listed is left as it is."""
+    status = api.get_claim(claim_id)["status"]
+    if status == api.Status.IN_PROGRESS:
+        carry_on(claim_id, agent.graph(), run.run_id)
+    elif status == api.Status.WAITING:
+        work_claim(claim_id, agent.graph(), run.run_id)
+    else:
+        return status
+    return api.get_claim(claim_id)["status"]

@@ -28,7 +28,6 @@ it("shows the queue with counts by state", async () => {
       },
       { ...summary, claim_id: "CLM-1004", status: "left_for_handler" },
     ],
-    "GET /api/runs/latest": null,
   });
   renderAt("/");
   const link = await screen.findByRole("link", { name: "CLM-1002" });
@@ -112,16 +111,13 @@ it("shows other errors loading a claim", async () => {
 it("shows the agent's instructions read only", async () => {
   stubApi({
     "GET /api/instructions": {
-      queue: "# Running the queue",
       claim: "# Working a claim\n\n## Contents of the claims manual",
     },
   });
   renderAt("/instructions");
-  const queue = await screen.findByRole("region", {
-    name: "Running the queue",
+  const claim = await screen.findByRole("region", {
+    name: "Working a claim",
   });
-  expect(within(queue).getByText("# Running the queue")).toBeDefined();
-  const claim = screen.getByRole("region", { name: "Working a claim" });
   expect(
     within(claim).getByText(/## Contents of the claims manual/),
   ).toBeDefined();

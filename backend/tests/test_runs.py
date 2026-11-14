@@ -1,100 +1,71 @@
 import pytest
 
-from backend import main
+from backend.tests.claim_requests import decide, start
+from backend.tests.runs import create_dispatch
 
 
-def start_run(client, cap=5):
-    return client.post("/api/runs", json={"cap": cap})
+def add_claims(client, run_id, *claim_ids):
+    return client.put(f"/api/runs/{run_id}/claims", json={"claim_ids": list(claim_ids)})
 
 
-def write(client, run_id, *todos):
-    return client.put(
-        f"/api/runs/{run_id}/todos",
-        json={"todos": [{"content": c, "status": s} for c, s in todos]},
-    )
-
-
-def test_no_run_yet(client):
-    response = client.get("/api/runs/latest")
-    assert response.status_code == 200
-    assert response.json() is None
-
-
-def test_start_a_run(client):
-    run = start_run(client).json()
-    assert run["cap"] == 5
-    assert run["status"] == "running"
+def test_create_a_dispatch(client):
+    run = create_dispatch(client, agents=3).json()
+    assert (run["kind"], run["agents"], run["status"]) == ("dispatch", 3, "running")
+    assert (run["model"], run["reasoning_effort"]) == ("openai/gpt-6-luna", "low")
+    assert (run["eval_set"], run["tiny"], run["finished_at"]) == (None, None, None)
     assert run["started_at"]
-    assert (run["finished_at"], run["summary"], run["todos"]) == (None, None, [])
-    assert client.get("/api/runs/latest").json() == run
+    assert run["claims"] == []
+    assert client.get(f"/api/runs/{run['run_id']}").json() == run
 
 
-@pytest.mark.parametrize("cap", [0, -1])
-def test_a_run_needs_a_cap(client, cap):
-    assert start_run(client, cap).status_code == 422
+def test_runs_are_numbered_in_order(client):
+    first = create_dispatch(client).json()
+    second = create_dispatch(client).json()
+    assert second["number"] == first["number"] + 1
 
 
-def test_write_todos_replaces_the_list(client):
-    run_id = start_run(client).json()["run_id"]
-    write(client, run_id, ("CLM-1001", "to_do"), ("CLM-1002", "to_do"))
-    run = write(
-        client,
-        run_id,
-        ("CLM-1001", "done"),
-        ("CLM-1002", "in_progress"),
-        ("Write the summary", "to_do"),
-    ).json()
-    assert run["todos"] == [
-        {"content": "CLM-1001", "status": "done"},
-        {"content": "CLM-1002", "status": "in_progress"},
-        {"content": "Write the summary", "status": "to_do"},
+@pytest.mark.parametrize("agents", [0, 26])
+def test_n_is_from_1_to_25(client, agents):
+    assert create_dispatch(client, agents=agents).status_code == 422
+
+
+def test_a_dispatch_records_its_claims_and_where_each_stands(client):
+    run_id = create_dispatch(client).json()["run_id"]
+    start(client, "CLM-1003")
+    decide(client, "CLM-1003", "refer", 0)
+    run = add_claims(client, run_id, "CLM-1003", "CLM-1001").json()
+    assert run["claims"] == [
+        {"claim_id": "CLM-1003", "status": "decided", "decision": "refer", "payout": 0},
+        {"claim_id": "CLM-1001", "status": "waiting", "decision": None, "payout": None},
     ]
-    assert client.get("/api/runs/latest").json()["todos"] == run["todos"]
+    run = add_claims(client, run_id, "CLM-1002").json()
+    assert [c["claim_id"] for c in run["claims"]] == ["CLM-1002"]
 
 
-def test_invalid_todos(client):
-    run_id = start_run(client).json()["run_id"]
-    assert write(client, run_id, ("CLM-1001", "blocked")).status_code == 422
-    assert write(client, run_id, ("", "to_do")).status_code == 422
-    assert write(client, "RUN-9", ("CLM-1001", "to_do")).status_code == 404
+def test_claims_for_an_unknown_run_or_claim(client):
+    assert add_claims(client, "no-such-run", "CLM-1001").status_code == 404
+    run_id = create_dispatch(client).json()["run_id"]
+    assert add_claims(client, run_id, "CLM-9999").status_code == 404
+    assert client.get("/api/runs/no-such-run").status_code == 404
 
 
 def test_finish_a_run(client):
-    run_id = start_run(client).json()["run_id"]
-    write(client, run_id, ("CLM-1001", "done"))
-    finish = client.post(
-        f"/api/runs/{run_id}/finish", json={"summary": "Worked 1 claim."}
-    )
-    run = finish.json()
-    assert (run["status"], run["summary"]) == ("finished", "Worked 1 claim.")
+    run_id = create_dispatch(client).json()["run_id"]
+    run = client.post(f"/api/runs/{run_id}/finish").json()
+    assert run["status"] == "finished"
     assert run["finished_at"]
-    assert run["todos"] == [{"content": "CLM-1001", "status": "done"}]
-    assert write(client, run_id, ("CLM-1001", "to_do")).status_code == 409
-    again = client.post(f"/api/runs/{run_id}/finish", json={"summary": "Again."})
+    again = client.post(f"/api/runs/{run_id}/finish")
     assert again.status_code == 409
-
-    newer = start_run(client, 2).json()
-    assert client.get("/api/runs/latest").json()["run_id"] == newer["run_id"]
-
-
-def test_finish_needs_a_summary_and_a_known_run(client):
-    run_id = start_run(client).json()["run_id"]
-    empty = client.post(f"/api/runs/{run_id}/finish", json={"summary": ""})
-    assert empty.status_code == 422
-    unknown = client.post("/api/runs/RUN-9/finish", json={"summary": "Done."})
-    assert unknown.status_code == 404
-    assert unknown.json()["detail"] == "Run RUN-9 not found"
+    assert again.json()["detail"] == f"Run {run_id} is not running"
+    assert add_claims(client, run_id, "CLM-1001").status_code == 409
 
 
-def test_runs_started_in_the_same_second_keep_their_order(client, monkeypatch):
-    monkeypatch.setattr(main, "now", lambda: "2026-10-02T12:00:00+00:00")
-    first = start_run(client).json()
-    client.post(f"/api/runs/{first['run_id']}/finish", json={"summary": "Done."})
-    second = start_run(client).json()
-    assert client.get("/api/runs/latest").json()["run_id"] == second["run_id"]
-
-
-def test_an_empty_to_do_list_clears_it(client):
-    run_id = start_run(client).json()["run_id"]
-    write(client, run_id, ("CLM-1001", "to_do"))
-    assert write(client, run_id).json()["todos"] == []
+def test_stop_the_runs_left_running(client):
+    finished = create_dispatch(client).json()["run_id"]
+    client.post(f"/api/runs/{finished}/finish")
+    running = create_dispatch(client).json()["run_id"]
+    stopped = client.post("/api/runs/stop").json()
+    assert [run["run_id"] for run in stopped] == [running]
+    assert client.get(f"/api/runs/{running}").json()["status"] == "stopped"
+    assert client.get(f"/api/runs/{finished}").json()["status"] == "finished"
+    assert client.post("/api/runs/stop").json() == []

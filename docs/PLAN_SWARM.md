@@ -226,23 +226,23 @@ Change the default model. Add the `model_calls` and `work_times` tables, `record
 
 Reshape `runs`, add `run_claims`, and add `create_dispatch`, `add_run_claims`, `get_run`, `finish_run` and `stop_runs`. Build `agent/dispatcher.py`, `harness.work_on`, `ClaimAgent` with a saver for each claim run, and `connections()`. Add the service's `start_dispatch`, with its lock, its skip set and `stop_runs` at startup. Tag each claim's trace with its run. Remove the queue agent, its middleware, `queue.md`, the to-do list and `uv run -m agent` without a claim id. Drop the old `todos` table when seeding.
 
-- [ ] pytest: the dispatcher's graph has the nodes `list_claims`, `work_claim` and `finish_run`, a conditional edge from `list_claims` to `work_claim`, and no checkpointer. `work_claim` has a `RetryPolicy` on `ModelRateLimitError` and `ModelTimeoutError` and an `error_handler`
-- [ ] pytest, with `harness.work_on` replaced by one that sleeps and counts the claims at work: with 12 waiting claims and N=3, never more than 3 are worked at once, every claim is worked once, and `finish_run` runs once, after the last
-- [ ] pytest: a dispatch lists the claims in progress and the waiting claims, oldest submitted first, records them on the run, and skips a claim in the service's resuming set, a decided claim and a claim left for a handler
-- [ ] Stub model test: the stub raises a `ModelRateLimitError` after the claim agent has read the claim. The dispatch carries the claim on as the same attempt, on the same thread. The second prompt holds the earlier tool result, and the claim has one decision and attempts 1
-- [ ] Stub model test: with the retries run out, the claim stays in progress with its progress saved, no `error` step and attempts 1. The dispatch works the other claims and finishes. The next dispatch carries the claim on as the same attempt
-- [ ] Stub model test: a claim that fails with any other error goes back to the queue and is tried once more in the same dispatch, as attempt 2 on a new thread. A claim that fails both times is left for a handler, and the dispatch still finishes
-- [ ] Stub model test: a claim in progress, stopped partway, is carried on by the next dispatch, and a claim signed off while the service was away is paid by it
-- [ ] Stub model test: each claim run's graph has a saver of its own (`ClaimAgent.graph()` gives a new saver each time)
-- [ ] Stub model test: each claim's root run keeps its session and carries `langfuse_tags` with the run's id. `uv run -m agent CLM-1001` (stubbed) runs with no tag and records its cost with no run
-- [ ] Service test: `start_dispatch` with N=3 returns 202, creates a dispatch with N, the model and its effort, and runs the dispatcher. A second start while it runs returns 409. N=0 or N=26 returns 422
-- [ ] Service test: on startup the service marks a running run as stopped
-- [ ] `uv run -m agent` with no claim id prints its usage and exits with an error. `uv run -m agent CLM-1001` (stubbed) works one claim
-- [ ] `grep -rn "write_todos\|queue_agent\|run_queue\|todos" agent backend dashboard/src e2e` finds nothing, and `backend/instructions/queue.md` is gone
-- [ ] `curl -s localhost:8000/api/instructions` returns only the claim instructions
-- [ ] `npm run seed` on Supabase succeeds with the old `todos` table in place, and Supabase MCP then shows no `todos` table in `undercover`, and `runs` with its new columns
-- [ ] The shared OpenAPI test passes for the backend and the agent's service
-- [ ] `npm run check` passes
+- [x] pytest: the dispatcher's graph has the nodes `list_claims`, `work_claim` and `finish_run`, a conditional edge from `list_claims` to `work_claim`, and no checkpointer. `work_claim` has a `RetryPolicy` on `ModelRateLimitError` and `ModelTimeoutError` and an `error_handler`
+- [x] pytest, with `harness.work_on` replaced by one that sleeps and counts the claims at work: with 12 waiting claims and N=3, never more than 3 are worked at once, every claim is worked once, and `finish_run` runs once, after the last
+- [x] pytest: a dispatch lists the claims in progress and the waiting claims, oldest submitted first, records them on the run, and skips a claim in the service's resuming set, a decided claim and a claim left for a handler
+- [x] Stub model test: the stub raises a `ModelRateLimitError` after the claim agent has read the claim. The dispatch carries the claim on as the same attempt, on the same thread. The second prompt holds the earlier tool result, and the claim has one decision and attempts 1
+- [x] Stub model test: with the retries run out, the claim stays in progress with its progress saved, no `error` step and attempts 1. The dispatch works the other claims and finishes. The next dispatch carries the claim on as the same attempt
+- [x] Stub model test: a claim that fails with any other error goes back to the queue and is tried once more in the same dispatch, as attempt 2 on a new thread. A claim that fails both times is left for a handler, and the dispatch still finishes
+- [x] Stub model test: a claim in progress, stopped partway, is carried on by the next dispatch, and a claim signed off while the service was away is paid by it
+- [x] Stub model test: each claim run's graph has a saver of its own (`ClaimAgent.graph()` gives a new saver each time)
+- [x] Stub model test: each claim's root run keeps its session and carries `langfuse_tags` with the run's id. `uv run -m agent CLM-1001` (stubbed) runs with no tag and records its cost with no run
+- [x] Service test: `start_dispatch` with N=3 returns 202, creates a dispatch with N, the model and its effort, and runs the dispatcher. A second start while it runs returns 409. N=0 or N=26 returns 422
+- [x] Service test: on startup the service marks a running run as stopped
+- [x] `uv run -m agent` with no claim id prints its usage and exits with an error. `uv run -m agent CLM-1001` (stubbed) works one claim
+- [x] `grep -rn "write_todos\|queue_agent\|run_queue\|todos" agent backend dashboard/src e2e` finds only the retired table's name, which seeding drops, and `backend/instructions/queue.md` is gone
+- [x] `curl -s localhost:8000/api/instructions` returns only the claim instructions
+- [x] `npm run seed` on Supabase succeeds with the old `todos` table in place, and Supabase MCP then shows no `todos` table in `undercover`, and `runs` with its new columns
+- [x] The shared OpenAPI test passes for the backend and the agent's service
+- [x] `npm run check` passes
 
 ## Phase 3: Starting a dispatch from the dashboard
 

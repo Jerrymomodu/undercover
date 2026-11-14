@@ -69,3 +69,10 @@ def decide(decision, payout):
 def graph_on(model, saver=None):
     """The claim graph on a stub model, saving its progress in memory."""
     return harness.claim_graph(model, saver or InMemorySaver())
+
+
+def agent_on(model, saver=None):
+    """The claim agent on a stub model, with every claim run saving its progress in
+    the same memory, as each would in the same database."""
+    saver = saver or InMemorySaver()
+    return harness.ClaimAgent(model, lambda: saver)

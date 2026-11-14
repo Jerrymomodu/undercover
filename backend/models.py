@@ -9,7 +9,13 @@ Status = Literal[
 ]
 DecisionKind = Literal["approve", "decline", "refer"]
 StepKind = Literal["tool_call", "tool_result", "message", "reading", "error"]
-TodoStatus = Literal["to_do", "in_progress", "done", "left_for_handler"]
+RunKind = Literal["dispatch", "evaluation"]
+RunStatus = Literal["running", "finished", "stopped"]
+DISPATCH: RunKind = "dispatch"
+RUNNING: RunStatus = "running"
+FINISHED: RunStatus = "finished"
+STOPPED: RunStatus = "stopped"
+EvalSet = Literal["evaluation", "held_out"]
 DocumentName = Literal["policy_wording", "claims_manual"]
 Benefit = Literal[
     "trip_cancellation",
@@ -132,7 +138,6 @@ class Step(BaseModel):
 
 
 class Instructions(BaseModel):
-    queue: str
     claim: str
 
 
@@ -284,28 +289,36 @@ class WorkTime(BaseModel):
     seconds: float
 
 
-class Todo(BaseModel):
-    content: str = Field(min_length=1)
-    status: TodoStatus
+MOST_AGENTS = 25
+
+
+class DispatchRequest(BaseModel):
+    agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
+    model: str = Field(min_length=1, description="The model the agent runs on")
+    reasoning_effort: str = Field(min_length=1, description="Its effort, or none")
+
+
+class RunClaimsRequest(BaseModel):
+    claim_ids: list[str] = Field(description="The claims to work, in order")
+
+
+class RunClaim(BaseModel):
+    claim_id: str
+    status: Status
+    decision: DecisionKind | None
+    payout: float | None
 
 
 class Run(BaseModel):
     run_id: str
-    cap: int
-    status: Literal["running", "finished"]
+    number: int
+    kind: RunKind
+    agents: int
+    status: RunStatus
     started_at: str
     finished_at: str | None
-    summary: str | None
-    todos: list[Todo]
-
-
-class RunRequest(BaseModel):
-    cap: int = Field(ge=1, description="The most claims the run can work")
-
-
-class TodosRequest(BaseModel):
-    todos: list[Todo]
-
-
-class FinishRequest(BaseModel):
-    summary: str = Field(min_length=1, description="The summary for the handlers")
+    eval_set: EvalSet | None
+    tiny: bool | None
+    model: str
+    reasoning_effort: str
+    claims: list[RunClaim]

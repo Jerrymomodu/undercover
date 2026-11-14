@@ -1,6 +1,7 @@
 """The UnderCover backend's API: one function for each operation the agent uses."""
 
 import os
+import time
 from enum import StrEnum
 from typing import Any, Literal, TypedDict
 
@@ -9,7 +10,8 @@ from pydantic import BaseModel, Field
 
 BACKEND_URL = os.getenv("UNDERCOVER_API", "http://127.0.0.1:8000")
 
-backend = httpx.Client(base_url=f"{BACKEND_URL}/api", timeout=30)
+# Longer than the backend waits for one of its connections when claim agents crowd it.
+backend = httpx.Client(base_url=f"{BACKEND_URL}/api", timeout=120)
 
 DecisionKind = Literal["approve", "decline", "refer"]
 APPROVE: DecisionKind = "approve"
@@ -34,18 +36,6 @@ class Status(StrEnum):
     WAITING_FOR_SIGN_OFF = "waiting_for_sign_off"
     DECIDED = "decided"
     LEFT_FOR_HANDLER = "left_for_handler"
-
-
-class RunStatus(StrEnum):
-    """Where a run of the queue agent stands."""
-
-    RUNNING = "running"
-    FINISHED = "finished"
-
-
-class Todo(TypedDict):
-    content: str
-    status: Literal["to_do", "in_progress", "done", "left_for_handler"]
 
 
 class ModelCall(TypedDict):
@@ -109,6 +99,23 @@ def _call(method: str, path: str, **request: Any) -> Any:
     if response.is_error:
         raise Refused(response.status_code, response.json()["detail"])
     return response.json()
+
+
+def health() -> dict[str, str]:
+    return _call("GET", "/health")
+
+
+def wait_for_backend(seconds: float) -> None:
+    """Wait until the backend answers, as when npm run dev starts it beside us."""
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            health()
+            return
+        except httpx.ConnectError:
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(1)
 
 
 def list_claims() -> list[dict[str, Any]]:
@@ -188,17 +195,22 @@ def fail_claim(claim_id: str, reason: str) -> dict[str, Any]:
     return _call("POST", f"/claims/{claim_id}/failure", json={"reason": reason})
 
 
-def start_run(cap: int) -> dict[str, Any]:
-    return _call("POST", "/runs", json={"cap": cap})
+def create_dispatch(agents: int, model: str, reasoning_effort: str) -> dict[str, Any]:
+    body = {"agents": agents, "model": model, "reasoning_effort": reasoning_effort}
+    return _call("POST", "/dispatches", json=body)
 
 
-def get_latest_run() -> dict[str, Any] | None:
-    return _call("GET", "/runs/latest")
+def add_run_claims(run_id: str, claim_ids: list[str]) -> dict[str, Any]:
+    return _call("PUT", f"/runs/{run_id}/claims", json={"claim_ids": claim_ids})
 
 
-def write_todos(run_id: str, todos: list[Todo]) -> dict[str, Any]:
-    return _call("PUT", f"/runs/{run_id}/todos", json={"todos": todos})
+def get_run(run_id: str) -> dict[str, Any]:
+    return _call("GET", f"/runs/{run_id}")
 
 
-def finish_run(run_id: str, summary: str) -> dict[str, Any]:
-    return _call("POST", f"/runs/{run_id}/finish", json={"summary": summary})
+def finish_run(run_id: str) -> dict[str, Any]:
+    return _call("POST", f"/runs/{run_id}/finish")
+
+
+def stop_runs() -> list[dict[str, Any]]:
+    return _call("POST", "/runs/stop")

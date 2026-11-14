@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import Column, ForeignKey, MetaData, Table, Text, inspect
 from sqlalchemy.pool import QueuePool
 
-from backend.database import engine, location
+from backend.database import engine, location, seed
 from backend.main import app
 
 SUPABASE = "postgresql://postgres.ref:secret@pooler.example.com:5432/db"
@@ -41,3 +42,15 @@ def test_startup_seeds_a_missing_or_empty_database(database, empty):
         database.touch()
     with TestClient(app) as client:
         assert len(client.get("/api/claims").json()) == 25
+
+
+def test_seeding_drops_the_queue_agent_s_old_to_do_table():
+    db = engine()
+    old = MetaData()
+    Table("runs", old, Column("run_id", Text, primary_key=True))
+    Table("todos", old, Column("run_id", Text, ForeignKey("runs.run_id")))
+    old.create_all(db, tables=[old.tables["todos"]])
+    assert inspect(db).has_table("todos")
+    seed(db)
+    assert not inspect(db).has_table("todos")
+    assert {"runs", "run_claims"} <= set(inspect(db).get_table_names())

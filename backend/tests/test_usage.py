@@ -1,6 +1,7 @@
 import pytest
 
 from backend.tests.claim_requests import start
+from backend.tests.runs import create_dispatch
 
 
 def model_call(client, claim_id, run_id=None, **changes):
@@ -30,13 +31,13 @@ def test_a_model_call_is_recorded_with_no_run(client):
 
 
 def test_a_model_call_is_recorded_with_its_run(client):
-    run_id = client.post("/api/runs", json={"cap": 1}).json()["run_id"]
+    run_id = create_dispatch(client).json()["run_id"]
     call = model_call(client, "CLM-1001", run_id).json()
     assert call["run_id"] == run_id
 
 
 def test_a_work_time_is_recorded(client):
-    run_id = client.post("/api/runs", json={"cap": 1}).json()["run_id"]
+    run_id = create_dispatch(client).json()["run_id"]
     time = work_time(client, "CLM-1001", run_id).json()
     assert (time["claim_id"], time["run_id"], time["seconds"]) == (
         "CLM-1001",

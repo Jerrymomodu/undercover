@@ -22,22 +22,26 @@ from backend.database import (
     model_calls,
     payments,
     policies,
+    run_claims,
     runs,
     seed,
     settings,
     steps,
-    todos,
     work_times,
 )
 from backend.documents import contents, search, sections, titles
 from backend.models import (
+    DISPATCH,
+    FINISHED,
+    RUNNING,
+    STOPPED,
     Claim,
     ClaimSummary,
     Decision,
     DecisionRequest,
+    DispatchRequest,
     DocumentName,
     FailureRequest,
-    FinishRequest,
     Handler,
     Instructions,
     ModelCall,
@@ -50,7 +54,8 @@ from backend.models import (
     Policy,
     PreviousClaim,
     Run,
-    RunRequest,
+    RunClaim,
+    RunClaimsRequest,
     Section,
     SectionMatch,
     SignOffRequest,
@@ -58,8 +63,6 @@ from backend.models import (
     Status,
     Step,
     StepRequest,
-    Todo,
-    TodosRequest,
     WorkTime,
     WorkTimeRequest,
 )
@@ -196,22 +199,25 @@ def find_run_row(db: Connection, run_id: str) -> RowMapping:
 
 
 def find_run(db: Connection, run_id: str) -> Run:
-    """Return one run with its to-do list, or raise a 404."""
+    """Return one run with its claims and where each stands, or raise a 404."""
     row = find_run_row(db, run_id)
     query = (
-        select(todos.c.content, todos.c.status)
-        .where(todos.c.run_id == run_id)
-        .order_by(todos.c.position)
+        claim_view.join(run_claims, run_claims.c.claim_id == claims.c.claim_id)
+        .where(run_claims.c.run_id == run_id)
+        .order_by(run_claims.c.position)
     )
-    items = [Todo(**todo) for todo in db.execute(query).mappings()]
-    return Run(**row, todos=items)
+    items = [
+        RunClaim(**{field: claim[field] for field in RunClaim.model_fields})
+        for claim in db.execute(query).mappings()
+    ]
+    return Run(**row, claims=items)
 
 
 def running_run(db: Connection, run_id: str) -> Run:
     """Return a run that is still running, or raise a 404 or a 409."""
     run = find_run(db, run_id)
-    if run.status != "running":
-        raise HTTPException(409, f"Run {run_id} has finished")
+    if run.status != RUNNING:
+        raise HTTPException(409, f"Run {run_id} is not running")
     return run
 
 
@@ -252,10 +258,9 @@ def get_claim_history(customer_id: str, db: Database) -> list[PreviousClaim]:
 
 @app.get("/api/instructions", operation_id="get_instructions")
 def get_instructions(db: Database) -> Instructions:
-    """Get the agent's instructions for running the queue and for working a claim."""
-    queue = (INSTRUCTIONS / "queue.md").read_text(encoding="utf-8")
+    """Get the claim agent's instructions, with the contents of the documents."""
     claim = (INSTRUCTIONS / "claim.md").read_text(encoding="utf-8")
-    return Instructions(queue=queue, claim=f"{claim}\n{contents(db)}")
+    return Instructions(claim=f"{claim}\n{contents(db)}")
 
 
 @app.get("/api/documents/search", operation_id="search_documents")
@@ -459,49 +464,66 @@ def fail_claim(claim_id: str, request: FailureRequest, db: Database) -> Claim:
     return to_claim(find_claim(db, claim_id))
 
 
-@app.post("/api/runs", operation_id="start_run")
-def start_run(request: RunRequest, db: Database) -> Run:
-    """Start a run of the agent on the queue, with an empty to-do list."""
+@app.post("/api/dispatches", operation_id="create_dispatch")
+def create_dispatch(request: DispatchRequest, db: Database) -> Run:
+    """Record a new dispatch, with N, the model and its reasoning effort."""
     run_id = str(uuid.uuid4())
     db.execute(
         insert(runs).values(
-            run_id=run_id, cap=request.cap, status="running", started_at=now()
+            run_id=run_id,
+            kind=DISPATCH,
+            status=RUNNING,
+            started_at=now(),
+            **request.model_dump(),
         )
     )
     return find_run(db, run_id)
 
 
-@app.get("/api/runs/latest", operation_id="get_latest_run")
-def get_latest_run(db: Database) -> Run | None:
-    """Get the newest run with its to-do list, or nothing before the first run."""
-    query = select(runs.c.run_id).order_by(runs.c.number.desc()).limit(1)
-    run_id = db.execute(query).scalar_one_or_none()
-    return None if run_id is None else find_run(db, run_id)
-
-
-@app.put("/api/runs/{run_id}/todos", operation_id="write_todos")
-def write_todos(run_id: str, request: TodosRequest, db: Database) -> Run:
-    """Replace the to-do list of a running run."""
+@app.put("/api/runs/{run_id}/claims", operation_id="add_run_claims")
+def add_run_claims(run_id: str, request: RunClaimsRequest, db: Database) -> Run:
+    """Record the claims a running dispatch works, in the order it listed them."""
     running_run(db, run_id)
-    db.execute(delete(todos).where(todos.c.run_id == run_id))
-    if request.todos:
+    for claim_id in request.claim_ids:
+        find_claim(db, claim_id)
+    db.execute(delete(run_claims).where(run_claims.c.run_id == run_id))
+    if request.claim_ids:
         db.execute(
-            insert(todos),
+            insert(run_claims),
             [
-                {"run_id": run_id, "position": position, **todo.model_dump()}
-                for position, todo in enumerate(request.todos)
+                {"run_id": run_id, "position": position, "claim_id": claim_id}
+                for position, claim_id in enumerate(request.claim_ids)
             ],
         )
     return find_run(db, run_id)
 
 
+@app.get("/api/runs/{run_id}", operation_id="get_run")
+def get_run(run_id: str, db: Database) -> Run:
+    """Get a dispatch or an evaluation with its claims and where each stands."""
+    return find_run(db, run_id)
+
+
 @app.post("/api/runs/{run_id}/finish", operation_id="finish_run")
-def finish_run(run_id: str, request: FinishRequest, db: Database) -> Run:
-    """Finish a run with the agent's summary for the handlers."""
+def finish_run(run_id: str, db: Database) -> Run:
+    """Finish a running dispatch or evaluation, once its claim agents have finished."""
     running_run(db, run_id)
     db.execute(
         update(runs)
         .where(runs.c.run_id == run_id)
-        .values(status="finished", finished_at=now(), summary=request.summary)
+        .values(status=FINISHED, finished_at=now())
     )
     return find_run(db, run_id)
+
+
+@app.post("/api/runs/stop", operation_id="stop_runs")
+def stop_runs(db: Database) -> list[Run]:
+    """Mark every run still running as stopped, as the agent's service starts."""
+    query = (
+        update(runs)
+        .where(runs.c.status == RUNNING)
+        .values(status=STOPPED)
+        .returning(runs.c.run_id)
+    )
+    stopped = list(db.execute(query).scalars())
+    return [find_run(db, run_id) for run_id in stopped]

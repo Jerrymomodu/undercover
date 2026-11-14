@@ -35,6 +35,8 @@ DATA = ROOT / "data"
 DOCUMENTS = {"policy_wording": "Policy wording", "claims_manual": "Claims manual"}
 SCHEMA = "undercover"
 CONNECTIONS = 4
+# Requests wait this long for one of the connections when claim agents crowd them.
+CONNECTION_WAIT_SECONDS = 90
 
 metadata = MetaData()
 
@@ -117,20 +119,25 @@ runs = Table(
     metadata,
     Column("number", Integer, primary_key=True),
     Column("run_id", Text, nullable=False, unique=True),
-    Column("cap", Integer, nullable=False),
+    Column("kind", Text, nullable=False),
+    Column("agents", Integer, nullable=False),
     Column("status", Text, nullable=False),
     Column("started_at", Text, nullable=False),
     Column("finished_at", Text),
-    Column("summary", Text),
+    Column("eval_set", Text),
+    Column("tiny", Boolean),
+    Column("model", Text, nullable=False),
+    Column("reasoning_effort", Text, nullable=False),
 )
-todos = Table(
-    "todos",
+run_claims = Table(
+    "run_claims",
     metadata,
     Column("run_id", Text, ForeignKey("runs.run_id"), primary_key=True),
     Column("position", Integer, primary_key=True),
-    Column("content", Text, nullable=False),
-    Column("status", Text, nullable=False),
+    Column("claim_id", Text, ForeignKey("claims.claim_id"), nullable=False),
 )
+# Tables of earlier builds, dropped when seeding: the queue agent's to-do list.
+RETIRED_TABLES = ["todos"]
 
 model_calls = Table(
     "model_calls",
@@ -199,7 +206,11 @@ def engine_for(url: URL) -> Engine:
     a connection for each request."""
     if on_postgres(url):
         return create_engine(
-            url, pool_size=CONNECTIONS, max_overflow=0, pool_pre_ping=True
+            url,
+            pool_size=CONNECTIONS,
+            max_overflow=0,
+            pool_timeout=CONNECTION_WAIT_SECONDS,
+            pool_pre_ping=True,
         )
     return create_engine(url, poolclass=NullPool)
 
@@ -236,6 +247,8 @@ def seed(db: Engine) -> dict[str, int]:
     with db.begin() as connection:
         if on_postgres(db.url):
             connection.execute(CreateSchema(SCHEMA, if_not_exists=True))
+        for name in RETIRED_TABLES:
+            Table(name, MetaData()).drop(connection, checkfirst=True)
         metadata.drop_all(connection)
         metadata.create_all(connection)
         connection.execute(

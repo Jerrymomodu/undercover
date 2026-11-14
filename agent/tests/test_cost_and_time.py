@@ -1,6 +1,6 @@
 from langgraph.checkpoint.memory import InMemorySaver
 
-from agent import harness
+from agent import api, harness
 from agent.tests.records import claim_of, model_calls_of, work_times_of
 from agent.tests.stubs import STUB_COST, call, decide, graph_on, record, stub
 from backend.tests.claim_requests import sign_off
@@ -52,7 +52,7 @@ def test_a_failed_attempt_still_records_its_cost_and_time(client):
 
 
 def test_a_run_s_id_goes_with_its_cost_and_time(client):
-    run_id = client.post("/api/runs", json={"cap": 1}).json()["run_id"]
+    run_id = api.create_dispatch(1, "stub", "none")["run_id"]
     harness.work_claim("CLM-1003", graph_on(stub(*decide("refer", 0))), run_id)
 
     assert {c["run_id"] for c in model_calls_of("CLM-1003")} == {run_id}

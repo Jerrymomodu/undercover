@@ -2,7 +2,7 @@
 
 from sqlalchemy import select
 
-from backend.database import engine, model_calls, work_times
+from backend.database import engine, model_calls, runs, work_times
 
 
 def rows_of(table, claim_id):
@@ -28,5 +28,8 @@ def steps_of(client, claim_id):
     return client.get(f"/api/claims/{claim_id}/steps").json()
 
 
-def latest(client):
-    return client.get("/api/runs/latest").json()
+def run_ids():
+    """The ids of every run the backend has recorded, oldest first."""
+    query = select(runs.c.run_id).order_by(runs.c.number)
+    with engine().connect() as db:
+        return list(db.execute(query).scalars())
