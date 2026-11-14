@@ -1,6 +1,6 @@
 # Process
 
-`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, passing them `.env`. `npm run seed` rebuilds the database `npm run dev` uses, on Supabase when `DATABASE_URL` is in `.env`. The agent always needs `DATABASE_URL`, where it saves its progress.
+`uv sync` and `npm install` at the repo root install everything, including a git pre-commit hook. `npm run dev` starts the backend, the agent's service and the dashboard, passing them `.env`; dispatches and evaluations start from the dashboard. `npm run seed` rebuilds the database `npm run dev` uses, on Supabase when `DATABASE_URL` is in `.env`. The agent always needs `DATABASE_URL`, where it saves its progress.
 
 `npm run check` runs every check:
 
@@ -44,7 +44,7 @@ The checks show that the code works, but not that it is fit to merge. Every code
 ## Rules
 
 - Add tests with each change. Tests never call a model; use a stub model.
-- Before a live run with the real model, reseed with `npm run seed`, and cap a queue run at five claims.
+- Before live runs with the real model, reseed once with `npm run seed`, and keep to the runs the brief asks for: a trial is a dispatch or an evaluation started from the dashboard, and an evaluation of the five `tiny` claims is the cheapest check. Evaluations work copies, so they need no reseed.
 - Outside a plan, commit each change once you have checked and reviewed it.
 - Run `npm run check` before you hand work over.
 - Never use `git commit --no-verify`.

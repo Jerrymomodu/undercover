@@ -298,25 +298,26 @@ class WorkTime(BaseModel):
 MOST_AGENTS = 25
 
 
-class DispatchRequest(BaseModel):
-    agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
-    model: str = Field(min_length=1, description="The model the agent runs on")
-    reasoning_effort: str = Field(min_length=1, description="Its effort, or none")
-
-
 class StartDispatchRequest(BaseModel):
     agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
 
 
-class StartEvaluationRequest(BaseModel):
-    agents: int = Field(ge=1, le=MOST_AGENTS, description="Claim agents at once")
-    eval_set: EvalSet = Field(description="The labelled set to work copies of")
+class StartEvaluationRequest(StartDispatchRequest):
+    eval_set: EvalSet = Field(description="The labeled set to work copies of")
     tiny: bool = Field(description="Just the set's five tiny claims")
 
 
-class EvaluationRequest(StartEvaluationRequest):
+class ModelChoice(BaseModel):
     model: str = Field(min_length=1, description="The model the agent runs on")
     reasoning_effort: str = Field(min_length=1, description="Its effort, or none")
+
+
+class DispatchRequest(StartDispatchRequest, ModelChoice):
+    pass
+
+
+class EvaluationRequest(StartEvaluationRequest, ModelChoice):
+    pass
 
 
 class RunClaimsRequest(BaseModel):

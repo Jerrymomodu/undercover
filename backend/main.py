@@ -535,7 +535,7 @@ def fail_claim(claim_id: str, request: FailureRequest, db: Database) -> Claim:
     return to_claim(find_claim(db, claim_id))
 
 
-@app.post("/api/dispatch/start", operation_id="start_dispatch", status_code=202)
+@app.post("/api/dispatches/start", operation_id="start_dispatch", status_code=202)
 def start_dispatch(request: StartDispatchRequest) -> dict[str, str]:
     """Ask the agent's service to start a dispatch with up to N claim agents at once."""
     agent_service.start_dispatch(request.agents)

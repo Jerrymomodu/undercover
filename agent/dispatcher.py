@@ -87,7 +87,7 @@ def left_in_progress(state: ClaimToWork, error: NodeError) -> Command[str]:
     """Leave a claim whose waits ran out in progress for the next dispatch, or one that
     failed outside the claim agent as it stands, and go on to finish the run, so that
     no error stops the dispatch."""
-    reason = harness.describe(error.error)
+    reason = f"{type(error.error).__name__}: {error.error}"
     if isinstance(error.error, harness.PASSING):
         log.warning("%s  left in progress: %s", state["claim_id"], reason)
     else:

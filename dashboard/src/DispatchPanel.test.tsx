@@ -120,7 +120,7 @@ it("says when there's no dispatch yet", async () => {
 
 it("starts a dispatch with 3 claim agents unless told otherwise", async () => {
   const { fetchMock } = showQueue(null, {
-    "POST /api/dispatch/start": { status: "accepted" },
+    "POST /api/dispatches/start": { status: "accepted" },
   });
   const found = await dispatchPanel();
   const agents = found.getByLabelText("Claim agents at once");
@@ -132,7 +132,7 @@ it("starts a dispatch with 3 claim agents unless told otherwise", async () => {
   fireEvent.click(found.getByRole("button", { name: "Start dispatch" }));
   await vi.waitFor(() => {
     const start = fetchMock.mock.calls.find(
-      ([path]) => path === "/api/dispatch/start",
+      ([path]) => path === "/api/dispatches/start",
     );
     expect(start?.[1]?.body).toBe(JSON.stringify({ agents: 25 }));
   });
@@ -140,7 +140,7 @@ it("starts a dispatch with 3 claim agents unless told otherwise", async () => {
 
 it("says why a dispatch didn't start", async () => {
   showQueue(null, {
-    "POST /api/dispatch/start": new Refusal(
+    "POST /api/dispatches/start": new Refusal(
       503,
       "The agent's service isn't running",
     ),

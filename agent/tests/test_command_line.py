@@ -69,7 +69,9 @@ def test_the_connection_settings(monkeypatch):
         assert kwargs["options"] == "-c search_path=undercover"
         assert "undercover" in repr(pool.statements[0])
 
+        monkeypatch.setattr(harness.api, "get_instructions", lambda: {"claim": "c"})
         agent = harness.claim_agent(stub(), opened)
+        assert agent.instructions == "c"
         for _ in range(2):
             agent.saver()
         first, second = FakeSaver.made[1:]
@@ -85,9 +87,11 @@ def graph(monkeypatch):
     monkeypatch.setattr(cli, "connections", lambda: nullcontext("pool"))
     monkeypatch.setattr(cli, "model", lambda: "model")
     monkeypatch.setattr(
-        cli, "claim_agent", lambda llm, pool: harness.ClaimAgent(llm, InMemorySaver)
+        cli,
+        "claim_agent",
+        lambda llm, pool: harness.ClaimAgent(llm, InMemorySaver, "Decide the claim."),
     )
-    monkeypatch.setattr(harness, "claim_graph", lambda llm, saver: graph)
+    monkeypatch.setattr(harness, "claim_graph", lambda llm, saver, text: graph)
     return graph
 
 

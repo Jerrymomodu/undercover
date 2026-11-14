@@ -15,7 +15,7 @@ from backend.tests.runs import create_dispatch
 
 
 def start_dispatch(client, agents=5):
-    return client.post("/api/dispatch/start", json={"agents": agents})
+    return client.post("/api/dispatches/start", json={"agents": agents})
 
 
 def test_starting_a_dispatch_reaches_the_agent_s_service(client, agent_answers):

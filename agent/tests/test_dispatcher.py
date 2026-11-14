@@ -191,9 +191,8 @@ def test_each_claim_run_has_a_saver_of_its_own(client):
         savers.append(InMemorySaver())
         return savers[-1]
 
-    agent = harness.ClaimAgent(
-        stub(*decide("refer", 0), *decide("refer", 0)), new_saver
-    )
+    replies = [*decide("refer", 0), *decide("refer", 0)]
+    agent = harness.ClaimAgent(stub(*replies), new_saver, "Decide the claim.")
     dispatch(agent, agents=2)
     assert len(savers) == 2
     assert savers[0] is not savers[1]

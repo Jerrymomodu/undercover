@@ -59,8 +59,9 @@ CONNECTIONS = 4
 CONNECTION_WAIT_SECONDS = 600
 CLAIM_MODEL_CALLS = 30
 NO_DECISION = "The agent finished without recording a decision"
-WORK_CLAIM = "Work claim"
-CARRY_ON = "Carry on"
+# The names of a claim's traces in Langfuse.
+WORK_CLAIM_TRACE = "Work claim"
+CARRY_ON_TRACE = "Carry on"
 AGENT = "agent"
 TOOLS = "tools"
 PAUSE = "wait_for_sign_off"
@@ -75,15 +76,17 @@ class TooManyModelCalls(Exception):
 
 @dataclass(frozen=True)
 class ClaimAgent:
-    """The claim agent: its model, and a new saver for each claim run, because a
-    saver holds a lock around every read and write."""
+    """The claim agent: its model, its instructions, fetched once for every claim it
+    works, and a new saver for each claim run, because a saver holds a lock around
+    every read and write."""
 
     llm: BaseChatModel
     saver: Callable[[], BaseCheckpointSaver[Any]]
+    instructions: str
 
     def graph(self) -> ClaimGraph:
         """Build a claim graph on a saver of its own."""
-        return claim_graph(self.llm, self.saver())
+        return claim_graph(self.llm, self.saver(), self.instructions)
 
 
 @dataclass(frozen=True)
@@ -140,8 +143,11 @@ def connections() -> Iterator[Pool]:
 
 
 def claim_agent(llm: BaseChatModel, pool: Pool) -> ClaimAgent:
-    """The claim agent on the model, saving each claim run's progress on the pool."""
-    return ClaimAgent(llm, partial(PostgresSaver, pool))
+    """The claim agent on the model, with the claim instructions from the backend,
+    saving each claim run's progress on the pool."""
+    return ClaimAgent(
+        llm, partial(PostgresSaver, pool), api.get_instructions()["claim"]
+    )
 
 
 def refusal(error: Exception) -> str:
@@ -245,13 +251,16 @@ def after_tools(state: ClaimState) -> str:
     return END
 
 
-def claim_graph(llm: BaseChatModel, saver: BaseCheckpointSaver[Any]) -> ClaimGraph:
-    """Build the claim agent's graph, which saves its progress after every step."""
-    instructions = SystemMessage(api.get_instructions()["claim"])
+def claim_graph(
+    llm: BaseChatModel, saver: BaseCheckpointSaver[Any], instructions: str
+) -> ClaimGraph:
+    """Build the claim agent's graph on its instructions, which saves its progress
+    after every step."""
+    system = SystemMessage(instructions)
     builder = StateGraph(ClaimState, context_schema=ClaimContext)
     builder.add_node(
         AGENT,
-        partial(call_model, llm=llm.bind_tools(CLAIM_TOOLS), instructions=instructions),
+        partial(call_model, llm=llm.bind_tools(CLAIM_TOOLS), instructions=system),
     )
     builder.add_node(
         TOOLS,
@@ -292,14 +301,9 @@ def claim_config(
     }
 
 
-def ask(text: str) -> Messages:
-    """Give an agent one message from the user."""
-    return {"messages": [HumanMessage(text)]}
-
-
 def begin(claim_id: str) -> Messages:
     """Give a claim agent its first message, naming the claim it works on."""
-    return ask(f"Claim {claim_id}")
+    return {"messages": [HumanMessage(f"Claim {claim_id}")]}
 
 
 def describe(error: BaseException) -> str:
@@ -378,7 +382,7 @@ def work_claim(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
     """Work one claim from a clean start, as a new attempt, and report how it ended."""
     claim = api.start_claim(claim_id, str(uuid.uuid4()))
     with timed(claim_id, run_id):
-        error = run_claim_graph(graph, begin(claim_id), claim, WORK_CLAIM, run_id)
+        error = run_claim_graph(graph, begin(claim_id), claim, WORK_CLAIM_TRACE, run_id)
     return settle(claim_id, error)
 
 
@@ -395,7 +399,7 @@ def carry_on(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
     elif saved.created_at is None and claim["decision"] is None:
         start = begin(claim_id)
     with timed(claim_id, run_id):
-        error = run_claim_graph(graph, start, claim, CARRY_ON, run_id)
+        error = run_claim_graph(graph, start, claim, CARRY_ON_TRACE, run_id)
     return settle(claim_id, error)
 
 

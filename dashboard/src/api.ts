@@ -244,7 +244,7 @@ export const api = {
   listHandlers: () => request<Handler[]>("/api/handlers"),
   getLatestDispatch: () => request<Run | null>("/api/dispatches/latest"),
   startDispatch: (agents: number) =>
-    post<{ status: string }>("/api/dispatch/start", { agents }),
+    post<{ status: string }>("/api/dispatches/start", { agents }),
   listEvaluations: () => request<Evaluation[]>("/api/evaluations"),
   getEvaluation: (runId: string) =>
     request<EvaluationDetail>(`/api/evaluations/${encodeURIComponent(runId)}`),

@@ -128,7 +128,7 @@ The backend, new and changed. Every operation keeps an `operation_id`, a one-lin
 
 | Operation | Route | What it does |
 | --- | --- | --- |
-| `start_dispatch` | `POST /api/dispatch/start` | Body `{agents}`. Asks the agent's service to start a dispatch. Passes on its 202 or 409, and returns 503 "The agent's service isn't running" when it can't be reached |
+| `start_dispatch` | `POST /api/dispatches/start` | Body `{agents}`. Asks the agent's service to start a dispatch. Passes on its 202 or 409, and returns 503 "The agent's service isn't running" when it can't be reached |
 | `start_evaluation` | `POST /api/evaluations/start` | Body `{agents, eval_set, tiny}`. The same, for an evaluation |
 | `create_dispatch` | `POST /api/dispatches` | Body `{agents, model, reasoning_effort}`. The service records a new dispatch |
 | `create_evaluation` | `POST /api/evaluations` | Body `{agents, eval_set, tiny, model, reasoning_effort}`. Records an evaluation and makes its copies |
@@ -140,7 +140,7 @@ The backend, new and changed. Every operation keeps an `operation_id`, a one-lin
 | `list_evaluations` | `GET /api/evaluations` | The evaluations, newest first, with their measures |
 | `get_evaluation` | `GET /api/evaluations/{run_id}` | One evaluation's measures and claims, with the handler's decision and payout beside the agent's |
 | `record_model_call` | `POST /api/claims/{claim_id}/model-calls` | Body `{run_id, model, input_tokens, output_tokens, cost}` |
-| `record_work_time` | `POST /api/claims/{claim_id}/work-times` | Body `{run_id, started_at, seconds}` |
+| `record_work_time` | `POST /api/claims/{claim_id}/work-times` | Body `{run_id, seconds}`; the backend works out when it started |
 | `sign_off_claim` | as today | Also refuses an evaluation's copy with a 409 |
 | `get_instructions` | as today | Returns only the claim agent's instructions |
 
@@ -289,19 +289,19 @@ Add the Scoreboard page, an evaluation's page, the header link and the end-to-en
 
 After one `npm run seed`, with `npm run dev` running and the default model, run the brief's live checks through the Playwright MCP server. Then bring the documents up to date.
 
-- [ ] Live: start a dispatch at N=3. Partway through, kill every process listening on port 8002: uvicorn's reloader and its worker. On this Windows machine, that's `Get-NetTCPConnection -LocalPort 8002 -State Listen` for the process ids, then `taskkill /F /T` on each. `npm run dev` then stops the others; start it again. The service marks the dispatch stopped
-- [ ] Live: a dispatch at N=25 carries on the claims left in progress as the same attempts (same thread ids and attempts) and works the rest with 25 at once, which the claims' first work times show. Its run takes well under the sum of its claims' times
-- [ ] Live: comparing claims worked from the start, each takes about as long at N=25 as the claims did at N=3. If they are slower, the report says where the time goes, keeping to 4 connections
-- [ ] Live: claims held for sign-off wait. A sign-off on the dashboard pays within five seconds (`browser_wait_for`). No claim fails for want of a database connection
-- [ ] Live: during the dispatch, Supabase MCP shows no more than 12 connections whose user is `postgres` in `pg_stat_activity`, checked several times
-- [ ] Live: through Langfuse's API, the claims of the N=25 dispatch are found together by its run id tag
-- [ ] Live: an evaluation of the evaluation set at N=25, and one of the held-out set's five tiny claims at N=5, appear on the scoreboard with every measure, and the queue page's counts are the same before and after
-- [ ] `docs/SPEC.md`: its sections on working the queue and on what the team needs to see describe the dispatch, the problems put right, the scoreboard and the cost and time. Its Rules are unchanged
-- [ ] `docs/TECH_STACK.md`: GPT-6 Luna by default, the dispatcher as the fifth part, `work_on`, the savers on the shared pool, the service's starts, cost from `usage.cost`, and Langfuse tags
-- [ ] `docs/PROCESS.md`: these runs replace the five-claim cap
-- [ ] `docs/CODE_STANDARDS.md`: rule 10 names `Send`, `RetryPolicy` and `error_handler` for the dispatcher, in place of middleware for the queue agent. Rule 13 gives the agent five parts
-- [ ] `docs/STATUS.md` describes what's built, how to start a dispatch and an evaluation, and the results of the live runs
-- [ ] `npm run check` passes, both with `.env` in place and with it moved out of the way
+- [x] Live: start a dispatch at N=3. Partway through, kill every process listening on port 8002: uvicorn's reloader and its worker. On this Windows machine, that's `Get-NetTCPConnection -LocalPort 8002 -State Listen` for the process ids, then `taskkill /F /T` on each. `npm run dev` then stops the others; start it again. The service marks the dispatch stopped
+- [x] Live: a dispatch at N=25 carries on the claims left in progress as the same attempts (same thread ids and attempts) and works the rest with 25 at once, which the claims' first work times show. Its run takes well under the sum of its claims' times (292 seconds against 4,175)
+- [x] Live: comparing claims worked from the start, each takes about as long at N=25 as the claims did at N=3. If they are slower, the report says where the time goes, keeping to 4 connections. They were slower, about 245 seconds against 67, and the time goes to waiting for the backend's 4 connections
+- [ ] Live: claims held for sign-off wait. A sign-off on the dashboard pays within five seconds (`browser_wait_for`). No claim fails for want of a database connection. Not met at N=25: claims held for sign-off waited and no claim failed for want of a connection, but a sign-off during the dispatch was paid after 13 seconds; at rest one paid within five. The backend's 4 connections are the bottleneck (see `docs/STATUS.md`, Known gaps)
+- [x] Live: during the dispatch, Supabase (queried directly, as its MCP server isn't connected here) shows no more than 12 connections whose user is `postgres` in `pg_stat_activity`, checked several times
+- [x] Live: through Langfuse's API (its v2 observations, filtered by tag), the claims of the N=25 dispatch are found together by its run id tag
+- [x] Live: an evaluation of the evaluation set at N=25, and one of the held-out set's five tiny claims at N=5, appear on the scoreboard with every measure, and the queue page's counts are the same before and after
+- [x] `docs/SPEC.md`: its sections on working the queue and on what the team needs to see describe the dispatch, the problems put right, the scoreboard and the cost and time. Its Rules are unchanged
+- [x] `docs/TECH_STACK.md`: GPT-6 Luna by default, the dispatcher as the fifth part, `work_on`, the savers on the shared pool, the service's starts, cost from `usage.cost`, and Langfuse tags
+- [x] `docs/PROCESS.md`: these runs replace the five-claim cap
+- [x] `docs/CODE_STANDARDS.md`: rule 10 names `Send`, `RetryPolicy` and `error_handler` for the dispatcher, in place of middleware for the queue agent. Rule 13 gives the agent five parts
+- [x] `docs/STATUS.md` describes what's built, how to start a dispatch and an evaluation, and the results of the live runs
+- [x] `npm run check` passes, both with `.env` in place and with it moved out of the way
 
 ## Not in this plan
 
