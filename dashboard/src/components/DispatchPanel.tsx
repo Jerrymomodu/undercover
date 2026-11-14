@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, type Run, type RunSummary } from "../api";
-import { cost, duration, money, time } from "../format";
+import { agentsAtOnce, cost, duration, money, time } from "../format";
 import { REFRESH_MS, useLoad } from "../useLoad";
 import { useSubmit } from "../useSubmit";
 import { AgentsInput, DEFAULT_AGENTS } from "./AgentsInput";
@@ -61,8 +61,7 @@ function DispatchDetails({ run }: Readonly<{ run: Run }>) {
   return (
     <>
       <p className="muted small">
-        Started at {time(run.started_at)} with {run.agents}{" "}
-        {run.agents === 1 ? "claim agent" : "claim agents"} at once
+        Started at {time(run.started_at)} with {agentsAtOnce(run.agents)}
         {finished_at && `, finished at ${time(finished_at)}`}
       </p>
       <p className="small">

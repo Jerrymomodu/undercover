@@ -279,11 +279,11 @@ Seed `held_out_claims` and `answer_key`. Add `create_evaluation` with its copies
 
 Add the Scoreboard page, an evaluation's page, the header link and the end-to-end tests.
 
-- [ ] vitest: the start form sends the set, `tiny` and N; the list shows each evaluation with its status and every measure, newest first; an evaluation's page marks a miss and links each copy to its page
-- [ ] e2e: starting an evaluation of the held-out set's tiny claims with N=4 on the Scoreboard page reaches the stand-in with those values
-- [ ] e2e: an evaluation played through the API, with one copy decided wrongly, appears on the scoreboard with its measures. Its page shows the handler's decision beside the agent's, the miss marked, and a link to the copy's page
-- [ ] Browser: the scoreboard and an evaluation's page (filled through the API), in light and dark mode, follow `BRAND.md`, with no errors in `browser_console_messages`
-- [ ] `npm run check` passes
+- [x] vitest: the start form sends the set, `tiny` and N; the list shows each evaluation with its status and every measure, newest first; an evaluation's page marks a miss and links each copy to its page
+- [x] e2e: starting an evaluation of the held-out set's tiny claims with N=4 on the Scoreboard page reaches the stand-in with those values
+- [x] e2e: an evaluation played through the API, with one copy decided wrongly, appears on the scoreboard with its measures. Its page shows the handler's decision beside the agent's, the miss marked, and a link to the copy's page
+- [x] Browser: the scoreboard and an evaluation's page (filled through the API), in light and dark mode, follow `BRAND.md`, with no errors in `browser_console_messages`
+- [x] `npm run check` passes
 
 ## Phase 6: The live runs, and the documents
 

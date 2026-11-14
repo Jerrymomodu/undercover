@@ -2,7 +2,7 @@
 
 The claims pilot in `docs/PLAN.md`, the harness in `docs/PLAN_HARNESS.md` and durable state in `docs/PLAN_DURABLE.md` are built: all six phases of each are done.
 
-The swarm in `docs/PLAN_SWARM.md` is being built: phases 1 to 4 are done. The agent runs on `openai/gpt-6-luna` with low reasoning effort by default, and records each model call's tokens and cost and the time of each run of the claim graph. On the queue page a handler starts a dispatch: a dispatcher with no model works every claim in progress and every waiting claim with up to N claim agents at once. Evaluations work copies of the labelled sets through the same dispatcher and claim agent, and the backend scores them; the Scoreboard page comes in phase 5.
+The swarm in `docs/PLAN_SWARM.md` is being built: phases 1 to 5 are done, and phase 6 (the live runs with the real model, and bringing SPEC, TECH_STACK, PROCESS and CODE_STANDARDS up to date) is left. On the queue page a handler starts a dispatch with up to N claim agents at once. On the Scoreboard page (`/scoreboard`) a handler starts an evaluation of the evaluation set or the held-out set, whole or its five tiny claims, sees every evaluation newest first with its measures, and opens one (`/scoreboard/:runId`) to see each copy's decision beside the handler's, with misses marked.
 
 ## Running it
 

@@ -198,9 +198,14 @@ p {
 }
 
 .status-left_for_handler,
-.step-failed {
+.step-failed,
+.miss {
   background: var(--raspberry);
   color: #ffffff;
+}
+
+.miss {
+  margin-left: 8px;
 }
 
 .tiles {
@@ -452,7 +457,8 @@ p {
 
 .sign-off-form select,
 .sign-off-form button,
-.start-form input,
+.start-form input[type="number"],
+.start-form select,
 .start-form button {
   font: inherit;
   font-size: 0.95rem;
@@ -467,11 +473,22 @@ p {
   min-width: 200px;
 }
 
-.start-form input {
+.start-form input[type="number"],
+.start-form select {
   background: var(--inset);
   color: var(--ink);
+}
+
+.start-form input[type="number"] {
   font-family: var(--mono);
   width: 7rem;
+}
+
+.start-form .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
 }
 
 .sign-off-form button,

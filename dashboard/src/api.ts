@@ -164,6 +164,40 @@ export interface Run {
   agent_seconds: number;
 }
 
+export interface Measures {
+  decision_accuracy: number;
+  accuracy: number;
+  cost_of_mistakes: number;
+  straight_through: number;
+  cost_per_claim: number;
+  seconds_per_claim: number;
+  run_seconds: number | null;
+}
+
+export interface ScoredClaim {
+  claim_id: string;
+  copy_of: string;
+  handler_decision: DecisionKind;
+  handler_payout: number;
+  decision: DecisionKind | null;
+  payout: number | null;
+  reason: string | null;
+  agent_decision: DecisionKind;
+  right: boolean;
+  mistake_cost: number;
+  cost: number;
+  seconds: number;
+}
+
+export interface Evaluation {
+  run: Run;
+  measures: Measures;
+}
+
+export interface EvaluationDetail extends Evaluation {
+  claims: ScoredClaim[];
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -211,6 +245,15 @@ export const api = {
   getLatestDispatch: () => request<Run | null>("/api/dispatches/latest"),
   startDispatch: (agents: number) =>
     post<{ status: string }>("/api/dispatch/start", { agents }),
+  listEvaluations: () => request<Evaluation[]>("/api/evaluations"),
+  getEvaluation: (runId: string) =>
+    request<EvaluationDetail>(`/api/evaluations/${encodeURIComponent(runId)}`),
+  startEvaluation: (agents: number, evalSet: EvalSet, tiny: boolean) =>
+    post<{ status: string }>("/api/evaluations/start", {
+      agents,
+      eval_set: evalSet,
+      tiny,
+    }),
   signOff: (claimId: string, handlerId: string) =>
     post<Claim>(`${claimPath(claimId)}/sign-off`, { handler_id: handlerId }),
 };
