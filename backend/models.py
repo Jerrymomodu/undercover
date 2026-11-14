@@ -252,6 +252,38 @@ class FailureRequest(BaseModel):
     reason: str = Field(min_length=1, description="What went wrong")
 
 
+class ModelCallRequest(BaseModel):
+    run_id: str | None = Field(description="The dispatch or evaluation, or null")
+    model: str = Field(min_length=1, description="The model that replied")
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    cost: float = Field(ge=0, description="In US dollars, as OpenRouter reports it")
+
+
+class ModelCall(BaseModel):
+    call_id: int
+    claim_id: str
+    run_id: str | None
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost: float
+    created_at: str
+
+
+class WorkTimeRequest(BaseModel):
+    run_id: str | None = Field(description="The dispatch or evaluation, or null")
+    seconds: float = Field(ge=0, description="How long the agent has just worked")
+
+
+class WorkTime(BaseModel):
+    work_id: int
+    claim_id: str
+    run_id: str | None
+    started_at: str
+    seconds: float
+
+
 class Todo(BaseModel):
     content: str = Field(min_length=1)
     status: TodoStatus

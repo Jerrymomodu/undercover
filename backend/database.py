@@ -132,6 +132,28 @@ todos = Table(
     Column("status", Text, nullable=False),
 )
 
+model_calls = Table(
+    "model_calls",
+    metadata,
+    Column("call_id", Integer, primary_key=True),
+    Column("claim_id", Text, ForeignKey("claims.claim_id"), nullable=False),
+    Column("run_id", Text, ForeignKey("runs.run_id")),
+    Column("model", Text, nullable=False),
+    Column("input_tokens", Integer, nullable=False),
+    Column("output_tokens", Integer, nullable=False),
+    Column("cost", Float, nullable=False),
+    Column("created_at", Text, nullable=False),
+)
+work_times = Table(
+    "work_times",
+    metadata,
+    Column("work_id", Integer, primary_key=True),
+    Column("claim_id", Text, ForeignKey("claims.claim_id"), nullable=False),
+    Column("run_id", Text, ForeignKey("runs.run_id")),
+    Column("started_at", Text, nullable=False),
+    Column("seconds", Float, nullable=False),
+)
+
 claim_view = (
     select(
         claims.c.claim_id,

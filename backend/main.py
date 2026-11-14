@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -19,6 +19,7 @@ from backend.database import (
     engine,
     handlers,
     is_seeded,
+    model_calls,
     payments,
     policies,
     runs,
@@ -26,6 +27,7 @@ from backend.database import (
     settings,
     steps,
     todos,
+    work_times,
 )
 from backend.documents import contents, search, sections, titles
 from backend.models import (
@@ -38,6 +40,8 @@ from backend.models import (
     FinishRequest,
     Handler,
     Instructions,
+    ModelCall,
+    ModelCallRequest,
     Payment,
     PaymentRequest,
     Payout,
@@ -56,6 +60,8 @@ from backend.models import (
     StepRequest,
     Todo,
     TodosRequest,
+    WorkTime,
+    WorkTimeRequest,
 )
 from backend.payout import needs_sign_off, work_out_payout
 
@@ -181,11 +187,17 @@ def add_step(
     return Step(**db.execute(query).mappings().one())
 
 
-def find_run(db: Connection, run_id: str) -> Run:
-    """Return one run with its to-do list, or raise a 404."""
+def find_run_row(db: Connection, run_id: str) -> RowMapping:
+    """Return one run's row, or raise a 404."""
     row = db.execute(select(runs).where(runs.c.run_id == run_id)).mappings().first()
     if row is None:
         raise HTTPException(404, f"Run {run_id} not found")
+    return row
+
+
+def find_run(db: Connection, run_id: str) -> Run:
+    """Return one run with its to-do list, or raise a 404."""
+    row = find_run_row(db, run_id)
     query = (
         select(todos.c.content, todos.c.status)
         .where(todos.c.run_id == run_id)
@@ -303,6 +315,42 @@ def list_steps(claim_id: str, db: Database) -> list[Step]:
     find_claim(db, claim_id)
     query = select(steps).where(steps.c.claim_id == claim_id).order_by(steps.c.step_id)
     return [Step(**row) for row in db.execute(query).mappings()]
+
+
+@app.post("/api/claims/{claim_id}/model-calls", operation_id="record_model_call")
+def record_model_call(
+    claim_id: str, request: ModelCallRequest, db: Database
+) -> ModelCall:
+    """Record the tokens and cost of one of the agent's model calls on a claim."""
+    find_claim(db, claim_id)
+    if request.run_id is not None:
+        find_run_row(db, request.run_id)
+    query = (
+        insert(model_calls)
+        .values(claim_id=claim_id, created_at=now(), **request.model_dump())
+        .returning(model_calls)
+    )
+    return ModelCall(**db.execute(query).mappings().one())
+
+
+@app.post("/api/claims/{claim_id}/work-times", operation_id="record_work_time")
+def record_work_time(claim_id: str, request: WorkTimeRequest, db: Database) -> WorkTime:
+    """Record how long the agent has just worked on a claim in one go."""
+    find_claim(db, claim_id)
+    if request.run_id is not None:
+        find_run_row(db, request.run_id)
+    started = datetime.now(UTC) - timedelta(seconds=request.seconds)
+    query = (
+        insert(work_times)
+        .values(
+            claim_id=claim_id,
+            run_id=request.run_id,
+            started_at=started.isoformat(timespec="seconds"),
+            seconds=request.seconds,
+        )
+        .returning(work_times)
+    )
+    return WorkTime(**db.execute(query).mappings().one())
 
 
 @app.post("/api/claims/{claim_id}/decision", operation_id="record_decision")

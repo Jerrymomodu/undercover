@@ -48,6 +48,16 @@ class Todo(TypedDict):
     status: Literal["to_do", "in_progress", "done", "left_for_handler"]
 
 
+class ModelCall(TypedDict):
+    """One model reply's tokens and cost, with the run it happened in, if any."""
+
+    run_id: str | None
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cost: float
+
+
 LineKind = Literal[
     "item", "electronics", "cash", "expense", "hotel", "meals_without_receipts"
 ]
@@ -163,6 +173,15 @@ def record_decision(
 
 def pay_claim(claim_id: str, amount: float) -> dict[str, Any]:
     return _call("POST", f"/claims/{claim_id}/payment", json={"amount": amount})
+
+
+def record_model_call(claim_id: str, call: ModelCall) -> dict[str, Any]:
+    return _call("POST", f"/claims/{claim_id}/model-calls", json=call)
+
+
+def record_work_time(claim_id: str, run_id: str | None, seconds: float) -> Any:
+    body = {"run_id": run_id, "seconds": seconds}
+    return _call("POST", f"/claims/{claim_id}/work-times", json=body)
 
 
 def fail_claim(claim_id: str, reason: str) -> dict[str, Any]:

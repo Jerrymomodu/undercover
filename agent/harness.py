@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from functools import partial
+from time import perf_counter
 from typing import Any, cast
 
 from langchain.agents import create_agent
@@ -25,6 +26,7 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
+from langchain_core.messages.ai import UsageMetadata
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_openai import ChatOpenAI
 from langfuse.langchain import CallbackHandler
@@ -53,7 +55,7 @@ Messages = dict[str, list[BaseMessage]]
 Start = Messages | Command | None
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
+DEFAULT_MODEL = "openai/gpt-6-luna"
 SCHEMA = "undercover"
 CONNECTIONS = 4
 CLAIM_MODEL_CALLS = 30
@@ -76,7 +78,7 @@ class TooManyModelCalls(Exception):
 
 
 def model() -> ChatOpenAI:
-    """Return the model named in MODEL_NAME, or DeepSeek V4.1 Flash by default."""
+    """Return the model named in MODEL_NAME, or GPT-6 Luna by default."""
     name = os.getenv("MODEL_NAME")
     return ChatOpenAI(
         model=name or DEFAULT_MODEL,
@@ -149,6 +151,21 @@ def record_result(
     return result
 
 
+def record_usage(context: ClaimContext, reply: AIMessage) -> None:
+    """Record the tokens and cost of a model reply, as OpenRouter reports them, with
+    the claim and its run."""
+    usage = cast(UsageMetadata, reply.usage_metadata)
+    metadata = reply.response_metadata
+    call: api.ModelCall = {
+        "run_id": context.run_id,
+        "model": metadata["model_name"],
+        "input_tokens": usage["input_tokens"],
+        "output_tokens": usage["output_tokens"],
+        "cost": metadata["token_usage"]["cost"],
+    }
+    api.record_model_call(context.claim_id, call)
+
+
 def call_model(
     state: ClaimState,
     runtime: Runtime[ClaimContext],
@@ -156,12 +173,13 @@ def call_model(
     instructions: SystemMessage,
 ) -> dict[str, Any]:
     """Ask the model for its next step, up to CLAIM_MODEL_CALLS times in all, and
-    record its reply on the claim."""
+    record its reply and what it cost on the claim."""
     calls = state["model_calls"]
     if calls >= CLAIM_MODEL_CALLS:
         message = f"The claim agent made {calls} model calls without finishing"
         raise TooManyModelCalls(message)
-    reply = llm.invoke([instructions, *state["messages"]])
+    reply = cast(AIMessage, llm.invoke([instructions, *state["messages"]]))
+    record_usage(runtime.context, reply)
     record_reply(runtime.context.claim_id, reply)
     return {"messages": [reply], "model_calls": 1}
 
@@ -267,7 +285,11 @@ def report(claim: dict[str, Any], reason: str) -> str:
 
 
 def run_claim_graph(
-    graph: ClaimGraph, start: Start, claim: dict[str, Any], name: str
+    graph: ClaimGraph,
+    start: Start,
+    claim: dict[str, Any],
+    name: str,
+    run_id: str | None,
 ) -> str | None:
     """Run the claim graph on the claim's thread, saving each step, and say what went
     wrong, if anything."""
@@ -278,12 +300,22 @@ def run_claim_graph(
             graph.invoke,
             start,
             claim_config(claim, name),
-            context=ClaimContext(claim["claim_id"]),
+            context=ClaimContext(claim["claim_id"], run_id),
             durability="sync",
         )
     except Exception as error:  # a claim that fails must not stop the run
         return describe(error)
     return None
+
+
+@contextmanager
+def timed(claim_id: str, run_id: str | None) -> Iterator[None]:
+    """Record how long the agent works on a claim in one go, with its run."""
+    clock = perf_counter()
+    try:
+        yield
+    finally:
+        api.record_work_time(claim_id, run_id, perf_counter() - clock)
 
 
 def settle(claim_id: str, error: str | None) -> str:
@@ -300,14 +332,15 @@ def settle(claim_id: str, error: str | None) -> str:
     return line
 
 
-def work_claim(claim_id: str, graph: ClaimGraph) -> str:
+def work_claim(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
     """Work one claim from a clean start, as a new attempt, and report how it ended."""
     claim = api.start_claim(claim_id, str(uuid.uuid4()))
-    error = run_claim_graph(graph, begin(claim_id), claim, WORK_CLAIM)
+    with timed(claim_id, run_id):
+        error = run_claim_graph(graph, begin(claim_id), claim, WORK_CLAIM, run_id)
     return settle(claim_id, error)
 
 
-def carry_on(claim_id: str, graph: ClaimGraph) -> str:
+def carry_on(claim_id: str, graph: ClaimGraph, run_id: str | None) -> str:
     """Carry a claim in progress on from its saved progress, as the same attempt, and
     report how it ended. A claim at the pause has been signed off, so it resumes past
     it. One with nothing saved, stopped before its first step, starts on its own
@@ -319,7 +352,8 @@ def carry_on(claim_id: str, graph: ClaimGraph) -> str:
         start = Command(resume=True)
     elif saved.created_at is None and claim["decision"] is None:
         start = begin(claim_id)
-    error = run_claim_graph(graph, start, claim, CARRY_ON)
+    with timed(claim_id, run_id):
+        error = run_claim_graph(graph, start, claim, CARRY_ON, run_id)
     return settle(claim_id, error)
 
 
@@ -341,7 +375,7 @@ def carry_on_stopped(graph: ClaimGraph) -> None:
     agent was away."""
     for claim in api.list_claims():
         if claim["status"] == api.Status.IN_PROGRESS:
-            carry_on(claim["claim_id"], graph)
+            carry_on(claim["claim_id"], graph, None)
 
 
 def missed(run: RunContext) -> list[str]:
@@ -401,7 +435,7 @@ def run_queue(cap: int | None, llm: BaseChatModel, graph: ClaimGraph) -> None:
         return
     cap = min(cap or count, count)
     run_id = api.start_run(cap)["run_id"]
-    run = RunContext(run_id, cap, partial(work_claim, graph=graph))
+    run = RunContext(run_id, cap, partial(work_claim, graph=graph, run_id=None))
     try:
         summary = work_queue(run, queue_agent(llm, cap))
     except Exception as error:

@@ -10,6 +10,13 @@ from langgraph.checkpoint.memory import InMemorySaver
 
 from agent import harness
 
+# What OpenRouter reports with each reply: the tokens, and the cost in dollars.
+STUB_COST = 0.002
+USAGE = {
+    "usage_metadata": {"input_tokens": 1200, "output_tokens": 80, "total_tokens": 1280},
+    "response_metadata": {"model_name": "stub", "token_usage": {"cost": STUB_COST}},
+}
+
 
 class StubModel(GenericFakeChatModel):
     """A chat model that gives scripted replies, or raises a scripted error,
@@ -26,6 +33,7 @@ class StubModel(GenericFakeChatModel):
         if isinstance(reply, BaseException):
             raise reply
         message = AIMessage(content=reply) if isinstance(reply, str) else reply
+        message = message.model_copy(update=USAGE)
         return ChatResult(generations=[ChatGeneration(message=message)])
 
 
